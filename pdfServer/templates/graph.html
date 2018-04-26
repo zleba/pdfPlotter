@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ 
+   <meta charset="UTF-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ 
+   <title>TMultiGraph with TLegend and custom labels</title>
+ 
+   <!--<script src="/home/radek/Downloads/root/root/etc/http/scripts/JSRootCore.js" type="text/javascript"></script>-->
+   <!-- <script src="https://root.cern/js/5.3.1/scripts/JSRootCore.js" type="text/javascript"></script> -->
+
+   <script src="https://root.cern/js/latest/scripts/JSRootCore.js" type="text/javascript"></script>
+
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+ 
+</head>
+ 
+<body>
+ 
+
+  <div style="float:left;width:820px;height:1000px">
+  <p>
+  <div id="pdfFrame" style="width: 800px; height:600px"></div>
+  <div id="ratioFrame" style="width: 800px; height:300px"></div>
+  </p>
+  </div>
+ 
+   <script type='text/javascript'>
+ 
+
+      var cnt = 0, drawing_ready = true;
+      var needRedraw = true;
+      var isFirst = true;
+      var ratioPainter = null;
+      var mainPainter = null;
+ 
+      function CreateLegendEntry(obj, lbl, opt = "l") {
+         var entry = JSROOT.Create("TLegendEntry"); 
+         entry.fObject = obj;
+         entry.fLabel = lbl;
+         entry.fOption = opt;
+         return entry; 
+      }
+
+
+      function getXpoints(nPoints, xMin, xMax, islogx) {
+          let xpts = [];
+          // this is just generation of graph
+          if(!islogx || xMin <= 0) {
+              let xmin = xMin - (xMax-xMin)*0.3;
+              let xmax = xMax + (xMax-xMin)*0.3;
+              for (var i=0; i<nPoints; i++) {
+                  let x = xmin  + i*(xmax-xmin)/nPoints;
+                  xpts.push(x); 
+              }
+          }
+          else {
+              let Lxmin = Math.log(xMin) - (Math.log(xMax)-Math.log(xMin))*0.3;
+              let Lxmax = Math.log(xMax) + (Math.log(xMax)-Math.log(xMin))*0.3;
+              for (var i=0; i<nPoints; i++) {
+                  let x = Lxmin  + i*(Lxmax-Lxmin)/nPoints;
+                  xpts.push(Math.exp(x)); 
+              }
+          }
+          return xpts;
+      } 
+
+
+       JSROOT.CreateTGraphErr = function(npoints, xpts, ypts) {
+          var graph = JSROOT.extend(JSROOT.Create("TGraphAsymmErrors"), { fBits: 0x3000408, fName: "graph", fTitle: "title" });
+
+          if (npoints>0) {
+             graph.fMaxSize = graph.fNpoints = npoints;
+
+             var usex = (typeof xpts == 'object') && (xpts.length === npoints);
+             var usey = (typeof ypts == 'object') && (ypts.length === npoints);
+
+             for (var i=0;i<npoints;++i) {
+                graph.fX.push(usex ? xpts[i] : i/npoints);
+                graph.fY.push(usey ? ypts[i] : i/npoints);
+
+                graph.fEXlow.push(0);
+                graph.fEXhigh.push(0);
+                graph.fEYlow.push(20);
+                graph.fEYhigh.push(20);
+
+             }
+          }
+
+          return graph;
+       }
+
+
+      const xminOrg = 1e-6, xmaxOrg = 1;
+      const npoints = 200;
+
+      var xminNow = xminOrg, xmaxNow = xmaxOrg;
+
+
+      class PDF {
+          constructor(pdfName, flav="gluon", q=10, scale=1) {
+            this.pdfName = pdfName;
+            this.flav    = flav;
+            this.q       = q;
+            this.scale   = scale;
+            this.graph   = null;
+            this.graphRat= null;
+          }
+      }
+    
+     //Two pdfs as default
+     var pdfArr = [];
+     pdfArr.push(new PDF("MRST2007lomod"));
+     //pdfArr.push(new PDF("MRST2007lomod"));
+
+    $(function() {
+        $("#qVal").attr("value", pdfArr[0].q);
+        $("#qVal").attr("value", pdfArr[0].q);
+
+        $('#qDiv').on('keyup change', 'input[id^="qVal"]', function() { // code
+            let qMy =  Number($(this).val());
+            for(let i = 0; i < pdfArr.length; ++i)
+                pdfArr[i].q = qMy;
+            //let idCh = "#" + $(this).attr("id");
+            //$('#qDiv').append('rad');
+            needRedraw = true;
+        });
+    });
+
+
+     function getYrange(pdfArr, xmin, xmax) {
+         let myMin = +Infinity;
+         let myMax = -Infinity;
+         for(let k = 0; k < pdfArr.length; ++k) {
+             for(let i = 0; i < pdfArr[k].graph.fY.length; ++i)
+                if(pdfArr[k].graph.fX[i] >= xmin && pdfArr[k].graph.fX[i] <= xmax) {
+                        let val = pdfArr[k].graph.fY[i];
+                        myMin = Math.min(myMin,  val);
+                        myMax = Math.max(myMax,  val);
+                }
+          }
+          return [myMin, myMax];
+          //myMax = ypts[i] > myMax ? ypts[i] : myMax;
+     }
+
+
+
+
+
+
+
+
+
+    $(document).ready(function(){
+            //$('select[id^="flavourBox_"]').change(function(){
+            $('#pdfDiv').on('change', 'select[id^="flavourBox_"]', function() { // code
+
+                    let idCh = "#" + $(this).attr("id");
+                    let i = Number(idCh.split("_").pop()) - 1;
+                    console.log("Flavour changed " + i + " " + pdfArr.length);
+
+                    let myValue = $(idCh).find(":selected").val();
+                    pdfArr[i].flav = myValue;
+                    needRedraw = true;
+                    //isFirst = true;
+
+             });
+
+            //$('select[id^="pdf_"]').change(function() {
+            $('#pdfDiv').on('change', 'select[id^="pdfType_"]', function() { // code
+                    let idCh = "#" + $(this).attr("id");
+                    let i = Number(idCh.split("_").pop()) - 1;
+
+                    let myValue = $(idCh).find(":selected").val();
+                    pdfArr[i].pdfName = myValue;
+                    needRedraw = true;
+                    //isFirst = true;
+            });
+
+            $('#pdfDiv').on('click', 'svg[id^="closePDF_"]', function() { // code
+                    let idCh = "#" + $(this).attr("id");
+                    let i = Number(idCh.split("_").pop()) - 1;
+
+                    //let myValue = $(idCh).find(":selected").val();
+                    pdfArr.splice(i, 1);
+                    //pdfArr[i].pdfName = myValue;
+                    needRedraw = true;
+                    $("#pdf_"+(i+1)).remove();
+
+                    for(let k = i+1; k <= pdfArr.length; ++k) {
+                        //$("#pdfDiv").append(plot1(pdfArr.length+1));
+                        modArr = ["pdf", "pdfType", "flavourBox", "closePDF"];
+                        for(t of modArr)
+                            $('#' + t + '_'+(k+1)).attr("id", t+'_'+k);
+                    }
+                    //isFirst = true;
+
+
+            });
+
+
+    });
+
+
+    function codeURL(obj, frameRat)
+    {
+        console.log(obj.root_pad());
+        let isLogX = obj.root_pad().fLogx;
+        let isLogY = obj.root_pad().fLogy;
+        let xmin = obj.root_pad().fUxmin;
+        let xmax = obj.root_pad().fUxmax;
+        let ymin = obj.root_pad().fUymin;
+        let ymax = obj.root_pad().fUymax;
+
+        
+        let s = 'pdfs=';
+        for(let i = 0; i < pdfArr.length; ++i)
+            s +=  pdfArr[i].pdfName +'-'+ pdfArr[i].flav +(i != pdfArr.length-1 ? ',': '');
+
+        
+        s += 'xl='+ xmin + '&xh='+xmax + '&yl='+ymin+'&yh='+ymax;
+        s += '&';
+        s += 'log='+isLogX+isLogY;
+        console.log('I am inside '+ymax);
+        window.history.pushState("object or string", "Title", "?" + s);
+
+    }
+
+      function mainPlotter(xpts, yptsArr)
+      {
+         for(let i = 0; i < pdfArr.length; ++i) {
+            pdfArr[i].graph = JSROOT.CreateTGraph(xpts.length, xpts, yptsArr[i]);
+         }
+
+         var yptsRatArr = [];
+         for(let j = 0; j < yptsArr.length; ++j) {
+             let tempRat = [];
+             for(let i = 0; i < xpts.length; ++i) {
+                 let ref = yptsArr[0][i];
+                 if(ref == 0) ref = 1;
+                 let val = yptsArr[j][i];
+                 if(val == 0 && ref == 0)
+                    tempRat.push(1);
+                else if(val != 0 && ref == 0)
+                    tempRat.push(0);
+                else
+                    tempRat.push(val/ref);
+            }
+            yptsRatArr.push(tempRat);
+         }
+         for(let i = 0; i < pdfArr.length; ++i) {
+            pdfArr[i].graphRat = JSROOT.CreateTGraph(xpts.length, xpts, yptsRatArr[i]);
+         }
+
+         let cols = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+         let grArr = [];
+         let grRatArr = [];
+         for(let i = 0; i < 10; ++i) {
+
+             if(i < pdfArr.length) {
+                 pdfArr[i].graph.fName = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
+                 pdfArr[i].graph.fLineColor = cols[i];
+                 pdfArr[i].graph.fLineWidth = 2;
+                 pdfArr[i].graph.fMarkerSize = 2;
+                 pdfArr[i].graph.fFillColor = 3;
+                 pdfArr[i].graph.fFillStyle = 1001;
+
+                 pdfArr[i].graphRat.fName = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
+                 pdfArr[i].graphRat.fLineColor = cols[i];
+                 pdfArr[i].graphRat.fLineWidth = 2;
+                 pdfArr[i].graphRat.fMarkerSize = 2;
+                 pdfArr[i].graphRat.fFillColor = 3;
+                 pdfArr[i].graphRat.fFillStyle = 1001;
+
+                 grArr.push(pdfArr[i].graph);
+                 grRatArr.push(pdfArr[i].graphRat);
+
+             }
+             else {
+                grDummy = JSROOT.CreateTGraph(1, [0], [0]);
+                grDummy.fName = "";
+                grDummy.fLineColor = cols[i];
+                grDummy.fLineWidth = 2;
+                grDummy.fMarkerSize = 2;
+                grDummy.fFillColor = 3;
+                grDummy.fFillStyle = 1001;
+                grArr.push(grDummy);
+
+                grDummyR = JSROOT.CreateTGraph(1, [0], [0]);
+                grDummyR.fName = "";
+                grDummyR.fLineColor = cols[i];
+                grDummyR.fLineWidth = 2;
+                grDummyR.fMarkerSize = 2;
+                grDummyR.fFillColor = 3;
+                grDummyR.fFillStyle = 1001;
+
+                grRatArr.push(grDummyR);
+
+             }
+         }
+
+         for(let i = 0; i < pdfArr.length; ++i) {
+            grArr.push(pdfArr[i].graph);
+            grRatArr.push(pdfArr[i].graphRat);
+         }
+ 
+         let mgraph = JSROOT.CreateTMultiGraph(...grArr);
+         mgraph.fTitle = "pdfPlotter";
+ 
+         var h1 = JSROOT.CreateTH1(10);
+         h1.fName = "axis_draw";
+         h1.fTitle = mgraph.fTitle;
+
+         h1.fXaxis.fXmin = 1e-8;
+         h1.fXaxis.fXmax = 1;
+
+         h1.fXaxis.fTitle = "x";
+         h1.fYaxis.fTitle = "xf(x)";
+
+         //console.log((ypts));
+         //let myMax = -1000;
+        //console.log(myMax);
+
+        /*
+         let myMin = +Infinity;
+         let myMax = -Infinity;
+         for(let i = 0; i < pdfArr[0].graph.fY.length; ++i)
+            if(pdfArr[0].graph.fX[i] >= xminNow && pdfArr[0].graph.fX[i] <= xmaxNow) {
+                for(let j = 0; j < pdfArr.length; ++j) {
+                    let val = pdfArr[j].graph.fY[i];
+                    myMin = Math.min(myMin,  val);
+                    myMax = Math.max(myMax,  val);
+                }
+            }
+            //myMax = ypts[i] > myMax ? ypts[i] : myMax;
+         //[myMin, myMax] = getYrange(pdfArr, xmin, xmax);
+         */
+
+         h1.fYaxis.fXmin = 0;
+         h1.fYaxis.fXmax = 1e4;
+         mgraph.fHistogram = h1;
+ 
+
+
+         var mgraphRat = JSROOT.CreateTMultiGraph(...grRatArr);
+
+         mgraphRat.fTitle = "";
+ 
+         var h1Rat = JSROOT.CreateTH1(10);
+         h1Rat.fName = "axis_draw";
+         h1Rat.fTitle = mgraphRat.fTitle;
+
+         h1Rat.fXaxis.fXmin =  h1.fXaxis.fXmin;
+         h1Rat.fXaxis.fXmax =  h1.fXaxis.fXmax;
+
+         h1Rat.fXaxis.fTitle = "x";
+         h1Rat.fYaxis.fTitle = "ratio";
+
+         h1Rat.fYaxis.fXmin = 0;
+         h1Rat.fYaxis.fXmax = 3;
+         mgraphRat.fHistogram = h1Rat;
+
+
+
+         let leg = JSROOT.Create("TLegend");
+         leg.fName = "graphs_legend";
+         width = pdfArr.length * 0.06;
+         JSROOT.extend(leg, { fX1NDC: 0.55, fY1NDC:0.7, fX2NDC: 0.9, fY2NDC:0.85 });
+
+         leg.fPrimitives.Add(CreateLegendEntry(null, "q = "+pdfArr[0].q+" GeV", "h"));
+         for(let i = 0; i < pdfArr.length; ++i) {
+             description = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
+             leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description));
+         }
+            
+
+         //if(typeof JSROOT.TPadPainter != 'undefined') 
+             //console.log(JSROOT.TPadPainter.this);
+ 
+         mgraph.fFunctions.Add(leg,"");
+
+         //console.log(mgraph);
+         //console.log(pdfArr[0].graph);
+         //console.log(h1);
+
+
+         // set fixed Y-range if required
+         // mgraph.fMinimum = 0;
+         // mgraph.fMaximum = 400;
+         //console.log(JSON.stringify(JSROOT));
+         drawing_ready = false;
+         
+         method = null;
+         if(isFirst)
+            method = JSROOT.draw;
+         else
+            method = JSROOT.redraw;
+
+         //$("#pdfFrame").empty(); //Remove before drawing
+         JSROOT.redraw('pdfFrame', mgraph, "", function(obj) {
+             mainPainter = obj;
+             drawing_ready = true; needRedraw = false;
+
+            for(let i = 0; i < pdfArr.length; ++i)
+                obj.painters[i].draw_object.fName = pdfArr[i].graph.fName;
+
+            if(obj.painters.length != pdfArr.length) {
+                //obj.painters[2] = new JSROOT.TGraphPainter(pdfArr[2].graph);
+                //obj.DrawNextGraph(2, "", pdfArr[2].graph);
+            }
+
+
+            //console.log(obj);
+            //console.log(obj.frame_painter());
+            //console.log(obj.root_pad());
+            //console.log(obj.firstpainter.scale_xmin+" "+obj.firstpainter.scale_xmax);
+
+            // zooming handled in frame painter now
+               //var fp =  obj.firstpainter;
+               var fp =  obj.frame_painter();
+               //console.log('fpBegin');
+               //console.log(fp);
+               //console.log(obj);
+               //console.log('fpEnd');
+               //console.log(obj.firstpainter.Zoom);
+
+    //console.log(obj);
+    //console.save(obj, 'radekFile.txt');
+    
+//let textToSave = JSON.stringify(obj);
+//console.log(textToSave);
+//let hiddenElement = document.createElement('a');
+//hiddenElement.href = 'data:attachment/text,' + encodeURI(textToSave);
+//hiddenElement.target = '_blank';
+//hiddenElement.download = 'myFile.txt';
+//hiddenElement.click();
+
+
+
+
+               // keep old function to be able invoke it again
+
+               if(isFirst) {
+                   fp.OldDrawAxes = fp.DrawAxes;
+
+
+                    console.log('radek-first');
+                   fp.OldZoom = fp.Zoom;
+                   // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
+                   fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
+
+                     if(typeof xmin != 'undefined' ||  typeof xmax != 'undefined' ) {
+                        xminNow = xmin;
+                        xmaxNow = xmax;
+                        if(xmin == 0 && xmax == 0) {
+                           xminNow = xminOrg;
+                           xmaxNow = xmaxOrg;
+                        }
+                        needRedraw = true;
+
+                     }
+                      if(ratioPainter != null) {
+                         //ratioPainter.frame_painter().Zoom(xminNow, xmaxNow);
+                         ratioPainter.frame_painter().Zoom(xmin, xmax);
+                      }
+
+                      this.OldZoom(xmin,xmax,ymin,ymax,zmin,zmax);
+                   }
+
+                   obj.root_pad().fLogx = true;
+                   obj.root_pad().fLogy = true;
+
+                   let xminR = 1e-5, xmaxR = 1;
+                   MinMax = getYrange(pdfArr, xminR, xmaxR);
+                   fp.Zoom(xminR, xmaxR, MinMax[0], MinMax[1]); //zoom
+
+
+                   fp.DrawAxes = function(shrink) {
+                      needRedraw = true;
+
+                      if(obj)
+                         codeURL(obj, ratioPainter);
+
+                      if(ratioPainter != null) {
+                         ratioPainter.root_pad().fUxmin =   obj.root_pad().fUxmin;
+                         ratioPainter.root_pad().fUxmax =   obj.root_pad().fUxmax;
+                         ratioPainter.root_pad().fLogx  =   obj.root_pad().fLogx;
+                         //ratioPainter.frame_painter().DrawAxes();
+                      }
+
+                      /*
+                      let isLogNow = obj.root_pad().fLogx;
+                      if(isLogx != isLogNow) {
+                          isLogx = isLogNow;
+                          needRedraw = true;
+
+                          if(ratioPainter != null) {
+                             ratioPainter.root_pad().fLogx;//   firstpainter.Zoom(xminNow, xmaxNow);
+                          }
+
+                      }
+                      */
+                      this.OldDrawAxes(shrink);
+                   };
+
+                   isFirst = false;
+                   //needRedraw = false;
+               }
+
+
+
+               ++cnt;
+               //console.log(obj.frame_painter());
+               //console.log(obj.root_pad());
+         });
+
+         //$("#ratioFrame").empty(); //Remove before drawing
+         JSROOT.redraw('ratioFrame', mgraphRat , "", function(painter) { ratioPainter = painter; drawing_ready = true;});
+
+         //let myObj = {};
+         //myObj.object = h1Rat;
+         //JSROOT.MakeSVG(myObj , function(arg) {console.log('beginSVG'); console.log(arg); console.log('endSVG');});
+
+      }
+
+
+      function updateGUI() {
+         if (!drawing_ready) return;
+         if (!needRedraw) return;
+         
+         drawing_ready = false;
+
+         let xminTemp = xminOrg;
+         let xmaxTemp = xmaxOrg;
+         let isLogTemp= true;
+
+         if(mainPainter) {
+             xminTemp  = mainPainter.root_pad().fUxmin;
+             xmaxTemp  = mainPainter.root_pad().fUxmax;
+             isLogTemp = mainPainter.root_pad().fLogx;
+             if(isLogTemp) {
+                xminTemp = Math.pow(10, xminTemp);
+                xmaxTemp = Math.pow(10, xmaxTemp);
+             }
+         }
+
+         let xpts =  getXpoints(npoints, xminTemp, xmaxTemp, isLogTemp);
+         let xpointsStr = JSON.stringify(xpts);
+
+
+        let ajaxG = function(myPDF,fl, q) {
+            return $.ajax({
+        url:  "http://127.0.0.1:5000/pdf/central/"+myPDF+"/"+fl+"/q/"+ q.toFixed(5) + "/"+xpointsStr });
+        }
+
+
+        console.log("Updating GUI -- start");
+        let funs = []
+        for(let i = 0; i < pdfArr.length; ++i)
+            funs.push(ajaxG(pdfArr[i].pdfName,pdfArr[i].flav, pdfArr[i].q) );
+
+//[ajaxG(pdfArr[0].pdfName,pdfArr[0].flav), ajaxG(pdfArr[1].pdfName, pdfArr[1].flav)];
+        $.when(...funs).done(function(...resArr){
+                console.log('results');
+
+                let vals = [];
+                if(funs.length > 1) {
+                    for(r of resArr)
+                        vals.push(JSON.parse(r[0]));
+                }
+                else {
+                    vals.push(JSON.parse(resArr[0]));
+                }
+                console.log('results3');
+                mainPlotter(xpts, vals);
+        });
+        console.log("Updating GUI -- end");
+
+         /*
+         console.log('BEGIN ajax');
+         $.ajax({url: "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/21/q/10.0/"+xpointsStr, success: function(result){
+                let vals = JSON.parse(result);
+                mainPlotter(xpts, vals);
+
+
+         }});
+         console.log('END ajax');
+         */
+      }
+ 
+      updateGUI();
+ 
+      setInterval(updateGUI, 100);
+ 
+
+    /*
+    $.when(ajax1()).done(function(a1){
+            // the code here will be executed when all four ajax requests resolve.
+            // a1, a2, a3 and a4 are lists of length 3 containing the response text,
+            // status, and jqXHR object for each of the four ajax calls respectively.
+
+                $("#div1").text(a1);
+                console.log("Blabal start");
+                console.log(JSON.parse(a1));
+                console.log("Blabal end");
+
+            });
+
+function ajax1() {
+    return $.ajax({
+url:  "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
+}
+
+    $(document).ready(function(){
+        $("button").click(function(){
+            $.ajax({url: "http://127.0.0.1:5000/pdf/central/MRST2007lomod/21/q/10.0/[0.01,0.08]", success: function(result){
+                $("#div1").html(result);
+            }});
+        });
+    });
+    */
+
+    //Print the pdf selectors
+    let pdfList = ["MRST2007lomod", "MRSTMCal", "MRST2004qed_proton",  "NNPDF31_lo_as_0118", "NNPDF31_lo_as_0130", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118"];
+    let flavList = [
+       "gluon",
+       "down-val",
+       "up-val",
+       "down",
+       "up",
+       "strange",
+       "charm",
+       "bottom",
+       "top",
+       "anti-down",
+       "anti-up",
+       "anti-strange",
+       "anti-charm",
+       "anti-bottom",
+       "anti-top",
+    ];
+
+    function plot1(id) {
+        selStr = '<div id="pdf_'+id+'">';
+        selStr +='<select id="pdfType_'+id+'" name="pdf'+id+'" >';
+        for(let pdf of pdfList) {
+            selStr += '<option>'+pdf+'</option>';
+        }
+        selStr += '</select>';
+
+        selStr += '<select id="flavourBox_'+id+'" name="flavour'+id+'" >';
+        for (fl of flavList) {
+          selStr += '<option>'+fl+'</option>';
+        }
+        selStr += '</select>';
+
+        if(id >= 2) {
+            //selStr += '<span id="closePDF_'+id+'">x</span>';
+            selStr += ' '+ delButton(id);
+        }
+        selStr += '</div>';
+        return selStr;
+    };
+
+    document.write('<div style="float:right;width:300px;height:300px"><p>');
+    document.write('<div id="qDiv">q = <input type="text" name="qVal" id="qVal" style="width:60px"> GeV</div>');
+    document.write('<div id="pdfDiv">');
+    for(let i = 1; i <= pdfArr.length; ++i)
+        document.write(plot1(i));
+    document.write('</div>');
+    document.write('<button id="addPDF">add</button>');
+    document.write("</p></div>");
+
+    $(document).ready(function(){
+        $("#addPDF").click(function(){
+            $("#pdfDiv").append(plot1(pdfArr.length+1));
+            pdfArr.push(new PDF(pdfArr[pdfArr.length-1].pdfName, "gluon", pdfArr[pdfArr.length-1].q ));
+            needRedraw = true;
+        });
+    });
+
+
+    function delButton(ID) {
+return '<svg enable-background="new 0 0 32 32" height="16px" id="closePDF_'+ID+'" version="1.1" viewBox="0 0 32 32" width="16px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M20.377,16.519l6.567-6.566c0.962-0.963,0.962-2.539,0-3.502l-0.876-0.875c-0.963-0.964-2.539-0.964-3.501,0  L16,12.142L9.433,5.575c-0.962-0.963-2.538-0.963-3.501,0L5.056,6.45c-0.962,0.963-0.962,2.539,0,3.502l6.566,6.566l-6.566,6.567  c-0.962,0.963-0.962,2.538,0,3.501l0.876,0.876c0.963,0.963,2.539,0.963,3.501,0L16,20.896l6.567,6.566  c0.962,0.963,2.538,0.963,3.501,0l0.876-0.876c0.962-0.963,0.962-2.538,0-3.501L20.377,16.519z" fill="#515151"/></svg>'
+    }
+
+
+
+
+
+
+
+    </script>
+
+</body>
+</html>
