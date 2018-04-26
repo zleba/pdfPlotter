@@ -116,6 +116,9 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
 #
     return str(pdfVals)
 
+#if __name__ == "__main__":
+    #app.run(host="0.0.0.0", debug=True, port=5555)
+
 
 
 #print(lhapdf.version())
