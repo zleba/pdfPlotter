@@ -552,7 +552,7 @@
 
         let ajaxG = function(myPDF,fl, q) {
             return $.ajax({
-        url:  "http://127.0.0.1:5000/pdf/central/"+myPDF+"/"+fl+"/q/"+ q.toFixed(5) + "/"+xpointsStr });
+        url:  "/pdf/central/"+myPDF+"/"+fl+"/q/"+ q.toFixed(5) + "/"+xpointsStr });
         }
 
 
@@ -580,7 +580,7 @@
 
          /*
          console.log('BEGIN ajax');
-         $.ajax({url: "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/21/q/10.0/"+xpointsStr, success: function(result){
+         $.ajax({url: "/pdf/cental/MRST2007lomod/21/q/10.0/"+xpointsStr, success: function(result){
                 let vals = JSON.parse(result);
                 mainPlotter(xpts, vals);
 
@@ -591,6 +591,16 @@
       }
  
       updateGUI();
+
+      /*
+      $(document).ready(function(){
+        // we call the function
+          updateGUI();
+          setInterval(updateGUI, 100);
+      });
+      */
+
+
  
       setInterval(updateGUI, 100);
  
@@ -610,12 +620,12 @@
 
 function ajax1() {
     return $.ajax({
-url:  "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
+url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
 }
 
     $(document).ready(function(){
         $("button").click(function(){
-            $.ajax({url: "http://127.0.0.1:5000/pdf/central/MRST2007lomod/21/q/10.0/[0.01,0.08]", success: function(result){
+            $.ajax({url: "/pdf/central/MRST2007lomod/21/q/10.0/[0.01,0.08]", success: function(result){
                 $("#div1").html(result);
             }});
         });
@@ -624,6 +634,10 @@ url:  "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" 
 
     //Print the pdf selectors
     let pdfList = ["MRST2007lomod", "MRSTMCal", "MRST2004qed_proton",  "NNPDF31_lo_as_0118", "NNPDF31_lo_as_0130", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118"];
+
+
+
+
     let flavList = [
        "gluon",
        "down-val",
@@ -664,7 +678,18 @@ url:  "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" 
         return selStr;
     };
 
-    document.write('<div style="float:right;width:300px;height:300px"><p>');
+
+    /*
+    console.log('begin');
+    $.ajax({url: "/pdfList", success: function(result){
+            result = result.replace(/'/g, '"');
+            console.log(result);
+            pdfList = JSON.parse(result);
+            }});
+    console.log('end');
+    */
+
+    document.write('<div style="float:right;width:350px;height:300px"><p>');
     document.write('<div id="qDiv">q = <input type="text" name="qVal" id="qVal" style="width:60px"> GeV</div>');
     document.write('<div id="pdfDiv">');
     for(let i = 1; i <= pdfArr.length; ++i)
@@ -673,10 +698,16 @@ url:  "http://127.0.0.1:5000/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" 
     document.write('<button id="addPDF">add</button>');
     document.write("</p></div>");
 
+
+
+
+
+
+
     $(document).ready(function(){
         $("#addPDF").click(function(){
             $("#pdfDiv").append(plot1(pdfArr.length+1));
-            pdfArr.push(new PDF(pdfArr[pdfArr.length-1].pdfName, "gluon", pdfArr[pdfArr.length-1].q ));
+            pdfArr.push(new PDF("MRST2007lomod", "gluon", pdfArr[pdfArr.length-1].q ));
             needRedraw = true;
         });
     });

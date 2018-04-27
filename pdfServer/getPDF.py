@@ -46,6 +46,13 @@ flavMap = {"gluon" : 21,
 
 pdfs = {}
 
+pdfAvail = lhapdf.availablePDFSets()
+
+@app.route('/pdfList')
+def pdfList():
+    return str(pdfAvail)
+
+
 
 @app.route('/pdf/<string:Type>/<string:pdfSet>/<string:flavour>/<string:varFix>/<float:var>/<points>')
 def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
@@ -53,8 +60,13 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
     if flavour not in flavMap:
         return ""
 
+    if pdfSet not in pdfAvail:
+        return ""
+
     if pdfSet not in pdfs:
+        print "Getting pdf " 
         pdfs[pdfSet] = lhapdf.getPDFSet(pdfSet).mkPDFs();
+        print "Done" 
     pdfNow = pdfs[pdfSet]
 
     def getPDF3(i, x, q):
@@ -116,8 +128,8 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
 #
     return str(pdfVals)
 
-#if __name__ == "__main__":
-    #app.run(host="0.0.0.0", debug=True, port=5555)
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
 
 
 

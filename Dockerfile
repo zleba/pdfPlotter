@@ -5,6 +5,8 @@ RUN mkdir /pdfPlotter /pdfPlotter/pdfServer
 WORKDIR /pdfPlotter
 COPY installLHA.sh  /pdfPlotter/
 RUN ./installLHA.sh
+COPY downloadPDF.sh  /pdfPlotter/
+RUN ./downloadPDF.sh
 COPY pdfServer /pdfPlotter/pdfServer
 WORKDIR /pdfPlotter/pdfServer
 
