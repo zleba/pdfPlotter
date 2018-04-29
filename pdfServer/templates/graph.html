@@ -19,10 +19,10 @@
 <body>
  
 
-  <div style="float:left;width:820px;height:1000px">
+  <div style="float:left;width:500px;height:700px">
   <p>
-  <div id="pdfFrame" style="width: 800px; height:600px"></div>
-  <div id="ratioFrame" style="width: 800px; height:300px"></div>
+  <div id="ratioFrame" style="position: absolute;left:0;top:340px; width: 500px; height:250px"></div>
+  <div id="pdfFrame" style="position: absolute;left:0;top:0; width: 500px; height:350px"></div>
   </p>
   </div>
  
@@ -31,7 +31,6 @@
 
       var cnt = 0, drawing_ready = true;
       var needRedraw = true;
-      var isFirst = true;
       var ratioPainter = null;
       var mainPainter = null;
  
@@ -92,10 +91,8 @@
        }
 
 
-      const xminOrg = 1e-6, xmaxOrg = 1;
       const npoints = 200;
 
-      var xminNow = xminOrg, xmaxNow = xmaxOrg;
 
 
       class PDF {
@@ -111,12 +108,20 @@
     
      //Two pdfs as default
      var pdfArr = [];
-     pdfArr.push(new PDF("MRST2007lomod"));
+     //pdfArr.push(new PDF("MRST2007lomod"));
      //pdfArr.push(new PDF("MRST2007lomod"));
 
+
+    var win;
+    [win, pdfArr] = decodeURL();
+
+
+
     $(function() {
-        $("#qVal").attr("value", pdfArr[0].q);
-        $("#qVal").attr("value", pdfArr[0].q);
+        if(pdfArr[0] != undefined)
+            $("#qVal").attr("value", pdfArr[0].q);
+        else
+            $("#qVal").attr("value", '10');
 
         $('#qDiv').on('keyup change', 'input[id^="qVal"]', function() { // code
             let qMy =  Number($(this).val());
@@ -163,7 +168,6 @@
                     let myValue = $(idCh).find(":selected").val();
                     pdfArr[i].flav = myValue;
                     needRedraw = true;
-                    //isFirst = true;
 
              });
 
@@ -175,7 +179,6 @@
                     let myValue = $(idCh).find(":selected").val();
                     pdfArr[i].pdfName = myValue;
                     needRedraw = true;
-                    //isFirst = true;
             });
 
             $('#pdfDiv').on('click', 'svg[id^="closePDF_"]', function() { // code
@@ -194,7 +197,6 @@
                         for(t of modArr)
                             $('#' + t + '_'+(k+1)).attr("id", t+'_'+k);
                     }
-                    //isFirst = true;
 
 
             });
@@ -203,29 +205,87 @@
     });
 
 
-    function codeURL(obj, frameRat)
+    function codeURL(mainFrame, ratioFrame)
     {
-        console.log(obj.root_pad());
-        let isLogX = obj.root_pad().fLogx;
-        let isLogY = obj.root_pad().fLogy;
-        let xmin = obj.root_pad().fUxmin;
-        let xmax = obj.root_pad().fUxmax;
-        let ymin = obj.root_pad().fUymin;
-        let ymax = obj.root_pad().fUymax;
+        //console.log(mainFrame.root_pad());
+        let isLogX = mainFrame.root_pad().fLogx;
+        let isLogY = mainFrame.root_pad().fLogy;
+        let xmin = mainFrame.root_pad().fUxmin;
+        let xmax = mainFrame.root_pad().fUxmax;
+        let ymin = mainFrame.root_pad().fUymin;
+        let ymax = mainFrame.root_pad().fUymax;
+        let rmin = ratioFrame.root_pad().fUymin;
+        let rmax = ratioFrame.root_pad().fUymax;
 
+        if(isLogX) {
+            xmin = Math.pow(10, xmin);
+            xmax = Math.pow(10, xmax);
+        }
+        if(isLogY) {
+            ymin = Math.pow(10, ymin);
+            ymax = Math.pow(10, ymax);
+        }
         
         let s = 'pdfs=';
         for(let i = 0; i < pdfArr.length; ++i)
-            s +=  pdfArr[i].pdfName +'-'+ pdfArr[i].flav +(i != pdfArr.length-1 ? ',': '');
+            s +=  pdfArr[i].pdfName +':'+ pdfArr[i].flav + ':q='+ pdfArr[i].q +  (i != pdfArr.length-1 ? ',': '');
 
-        
-        s += 'xl='+ xmin + '&xh='+xmax + '&yl='+ymin+'&yh='+ymax;
+        s += '&';
+        s += 'xl='+ xmin + '&xh='+xmax + '&yl='+ymin+'&yh='+ymax + '&rl='+rmin + '&rh='+rmax;
         s += '&';
         s += 'log='+isLogX+isLogY;
-        console.log('I am inside '+ymax);
+        //console.log('I am inside '+ymax);
         window.history.pushState("object or string", "Title", "?" + s);
-
     }
+
+    function decodeURL()
+    {
+
+        let url_string = window.location.href;
+        let objPars = (new URL(url_string)).searchParams;
+
+        let win = {};
+        win.xl = 1e-5;
+        win.xh = 1;
+        
+        win.yl = undefined;
+        win.yh = undefined;
+
+        win.rl = 0;
+        win.rh = 2;
+
+        win.log  = '11';
+
+        for(let key in win) {
+            //console.log('Getting property'+key);
+            if(objPars.get(key)) {
+                //console.log('Setting property'+key);
+                win[key] = objPars.get(key);
+            }
+        }
+        win.logX = win.log[0] == '1' ? true : false;
+        win.logY = win.log[1] == '1' ? true : false;
+
+        let pdfArr = [];
+        if(objPars.get('pdfs')) {
+            let pdfStr = objPars.get('pdfs').split(',');
+
+            for(p of pdfStr) {
+                let pNow = {};
+                let str = p.split(':');
+                pdfArr.push(new PDF(str[0], str[1], Number(str[2].substring(2))));
+            }
+        }
+        else {
+            pdfArr.push(new PDF("MRST2007lomod", "gluon"));
+        }
+
+        //console.log(win);
+        //console.log(pdfArr);
+
+        return [win, pdfArr]; //return window and pdfArr
+    }
+
 
       function mainPlotter(xpts, yptsArr)
       {
@@ -305,6 +365,9 @@
             grArr.push(pdfArr[i].graph);
             grRatArr.push(pdfArr[i].graphRat);
          }
+
+
+
  
          let mgraph = JSROOT.CreateTMultiGraph(...grArr);
          mgraph.fTitle = "pdfPlotter";
@@ -316,8 +379,36 @@
          h1.fXaxis.fXmin = 1e-8;
          h1.fXaxis.fXmax = 1;
 
-         h1.fXaxis.fTitle = "x";
+         //h1.fXaxis.fTitle = "x";
          h1.fYaxis.fTitle = "xf(x)";
+
+         let setFonts = function(hist, fontSize) {
+             hist.fXaxis.fLabelFont = 43;
+             hist.fXaxis.fLabelSize = fontSize;
+
+             hist.fXaxis.fTitleFont = 43;
+             hist.fXaxis.fTitleSize = fontSize;
+
+             hist.fYaxis.fLabelFont = 43;
+             hist.fYaxis.fLabelSize = fontSize;
+
+             hist.fYaxis.fTitleFont = 43;
+             hist.fYaxis.fTitleSize = fontSize;
+         };
+
+         setFonts(h1, 18);
+
+         h1.fXaxis.fLabelColor = 1;
+         h1.fXaxis.fLabelOffset = -99.10;
+         //h1.fXaxis.fTitleSize = 0;
+
+
+         
+         h1.fXaxis.fTickLength = 0.03;
+         h1.fYaxis.fTitleOffset = 1.1;
+         h1.fYaxis.fLabelOffset = 0.015;
+
+
 
          //console.log((ypts));
          //let myMax = -1000;
@@ -338,7 +429,7 @@
          //[myMin, myMax] = getYrange(pdfArr, xmin, xmax);
          */
 
-         h1.fYaxis.fXmin = 0;
+         h1.fYaxis.fXmin = -1e2;
          h1.fYaxis.fXmax = 1e4;
          mgraph.fHistogram = h1;
  
@@ -356,10 +447,24 @@
          h1Rat.fXaxis.fXmax =  h1.fXaxis.fXmax;
 
          h1Rat.fXaxis.fTitle = "x";
+         h1Rat.fXaxis.fTitleOffset = 1.1;
          h1Rat.fYaxis.fTitle = "ratio";
+         h1Rat.fYaxis.fTitleOffset = 0.8;
+         h1Rat.fYaxis.fLabelOffset = 0.015;
+
+
+         //h1Rat.fXaxis.fLabelFont = 43;
+         //h1Rat.fXaxis.fLabelSize = fontSize;
+         //h1Rat.fXaxis.fTitleFont = 43;
+         //h1Rat.fXaxis.fTitleSize = fontSize;
+
+         setFonts(h1Rat, 17);
+         h1Rat.fYaxis.fNdivisions = 404;
+
+
 
          h1Rat.fYaxis.fXmin = 0;
-         h1Rat.fYaxis.fXmax = 3;
+         h1Rat.fYaxis.fXmax = 10;
          mgraphRat.fHistogram = h1Rat;
 
 
@@ -369,7 +474,8 @@
          width = pdfArr.length * 0.06;
          JSROOT.extend(leg, { fX1NDC: 0.55, fY1NDC:0.7, fX2NDC: 0.9, fY2NDC:0.85 });
 
-         leg.fPrimitives.Add(CreateLegendEntry(null, "q = "+pdfArr[0].q+" GeV", "h"));
+         if(pdfArr[0] != undefined)
+             leg.fPrimitives.Add(CreateLegendEntry(null, "q = "+pdfArr[0].q+" GeV", "h"));
          for(let i = 0; i < pdfArr.length; ++i) {
              description = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
              leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description));
@@ -392,15 +498,10 @@
          //console.log(JSON.stringify(JSROOT));
          drawing_ready = false;
          
-         method = null;
-         if(isFirst)
-            method = JSROOT.draw;
-         else
-            method = JSROOT.redraw;
 
          //$("#pdfFrame").empty(); //Remove before drawing
          JSROOT.redraw('pdfFrame', mgraph, "", function(obj) {
-             mainPainter = obj;
+             //mainPainter = obj;
              drawing_ready = true; needRedraw = false;
 
             for(let i = 0; i < pdfArr.length; ++i)
@@ -423,6 +524,8 @@
                //console.log('fpBegin');
                //console.log(fp);
                //console.log(obj);
+               //console.log(obj.frame_painter());
+               //console.log(obj.root_pad());
                //console.log('fpEnd');
                //console.log(obj.firstpainter.Zoom);
 
@@ -442,39 +545,40 @@
 
                // keep old function to be able invoke it again
 
-               if(isFirst) {
+               if(mainPainter == null) {
+                   mainPainter = obj;
                    fp.OldDrawAxes = fp.DrawAxes;
 
 
-                    console.log('radek-first');
                    fp.OldZoom = fp.Zoom;
                    // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
                    fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
 
                      if(typeof xmin != 'undefined' ||  typeof xmax != 'undefined' ) {
-                        xminNow = xmin;
-                        xmaxNow = xmax;
-                        if(xmin == 0 && xmax == 0) {
-                           xminNow = xminOrg;
-                           xmaxNow = xmaxOrg;
+
+                        if(ratioPainter != null && zmin != -1) {
+                           ratioPainter.frame_painter().Zoom(xmin, xmax, undefined, undefined, -1);
                         }
                         needRedraw = true;
-
                      }
-                      if(ratioPainter != null) {
-                         //ratioPainter.frame_painter().Zoom(xminNow, xmaxNow);
-                         ratioPainter.frame_painter().Zoom(xmin, xmax);
-                      }
 
                       this.OldZoom(xmin,xmax,ymin,ymax,zmin,zmax);
                    }
 
-                   obj.root_pad().fLogx = true;
-                   obj.root_pad().fLogy = true;
+                   obj.root_pad().fLogx = win.logX;
+                   obj.root_pad().fLogy = win.logY;
 
-                   let xminR = 1e-5, xmaxR = 1;
-                   MinMax = getYrange(pdfArr, xminR, xmaxR);
-                   fp.Zoom(xminR, xmaxR, MinMax[0], MinMax[1]); //zoom
+                   fp.fY1NDC = 0.05;
+                   fp.fY2NDC = 0.90;
+                   fp.fX1NDC = 0.15;
+                   fp.fX2NDC = 0.95;
+
+
+                   //let xminR = 1e-5, xmaxR = 1;
+                   //let xminR = win.xl, xmaxR = win.xh;
+                   if(win.yl == undefined || win.yh == undefined)
+                       [win.yl, win.yh] = getYrange(pdfArr, win.xl, win.xh);
+                   fp.Zoom(win.xl, win.xh, win.yl, win.yh); //zoom
 
 
                    fp.DrawAxes = function(shrink) {
@@ -490,22 +594,9 @@
                          //ratioPainter.frame_painter().DrawAxes();
                       }
 
-                      /*
-                      let isLogNow = obj.root_pad().fLogx;
-                      if(isLogx != isLogNow) {
-                          isLogx = isLogNow;
-                          needRedraw = true;
-
-                          if(ratioPainter != null) {
-                             ratioPainter.root_pad().fLogx;//   firstpainter.Zoom(xminNow, xmaxNow);
-                          }
-
-                      }
-                      */
                       this.OldDrawAxes(shrink);
                    };
 
-                   isFirst = false;
                    //needRedraw = false;
                }
 
@@ -517,7 +608,48 @@
          });
 
          //$("#ratioFrame").empty(); //Remove before drawing
-         JSROOT.redraw('ratioFrame', mgraphRat , "", function(painter) { ratioPainter = painter; drawing_ready = true;});
+         JSROOT.redraw('ratioFrame', mgraphRat , "", function(obj) {
+
+            for(let i = 0; i < pdfArr.length; ++i)
+                obj.painters[i].draw_object.fName = pdfArr[i].graph.fName;
+
+            if(ratioPainter == undefined) {
+                   obj.root_pad().fLogx = win.logX;
+                   obj.root_pad().fLogy = false;
+
+                   let fp =  obj.frame_painter();
+
+                   fp.fY1NDC = 0.20;
+                   fp.fY2NDC = 0.96;
+                   fp.fX1NDC = 0.15;
+                   fp.fX2NDC = 0.95;
+
+                   fp.Zoom(win.xl, win.xh, win.rl, win.rh); //zoom
+
+
+                   fp.OldZoom = fp.Zoom;
+                   // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
+                   fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
+
+                     if(typeof xmin != 'undefined' ||  typeof xmax != 'undefined' ) {
+                        needRedraw = true;
+
+                       if(mainPainter != null && zmin != -1) {
+                           mainPainter.frame_painter().Zoom(xmin, xmax, undefined, undefined, -1);
+                        }
+                     }
+
+                      this.OldZoom(xmin,xmax,ymin,ymax,zmin,zmax);
+                   }
+
+
+
+            }
+
+            ratioPainter = obj;
+            drawing_ready = true;
+
+         });
 
          //let myObj = {};
          //myObj.object = h1Rat;
@@ -532,9 +664,9 @@
          
          drawing_ready = false;
 
-         let xminTemp = xminOrg;
-         let xmaxTemp = xmaxOrg;
-         let isLogTemp= true;
+         let xminTemp = win.xl;
+         let xmaxTemp = win.xh;
+         let isLogTemp= win.logX;
 
          if(mainPainter) {
              xminTemp  = mainPainter.root_pad().fUxmin;
@@ -562,20 +694,26 @@
             funs.push(ajaxG(pdfArr[i].pdfName,pdfArr[i].flav, pdfArr[i].q) );
 
 //[ajaxG(pdfArr[0].pdfName,pdfArr[0].flav), ajaxG(pdfArr[1].pdfName, pdfArr[1].flav)];
-        $.when(...funs).done(function(...resArr){
-                console.log('results');
+        if(pdfArr.length >= 1) {
+            $.when(...funs).done(function(...resArr){
+                    //console.log('results');
 
-                let vals = [];
-                if(funs.length > 1) {
-                    for(r of resArr)
-                        vals.push(JSON.parse(r[0]));
-                }
-                else {
-                    vals.push(JSON.parse(resArr[0]));
-                }
-                console.log('results3');
-                mainPlotter(xpts, vals);
-        });
+                    let vals = [];
+                    if(funs.length > 1) {
+                        for(r of resArr)
+                            vals.push(JSON.parse(r[0]));
+                    }
+                    else {
+                        vals.push(JSON.parse(resArr[0]));
+                    }
+                    //console.log('results3');
+                    mainPlotter(xpts, vals);
+            });
+        }
+        else {
+            mainPlotter(xpts, [xpts]);
+        }
+
         console.log("Updating GUI -- end");
 
          /*
@@ -633,9 +771,8 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     */
 
     //Print the pdf selectors
-    let pdfList = ["MRST2007lomod", "MRSTMCal", "MRST2004qed_proton",  "NNPDF31_lo_as_0118", "NNPDF31_lo_as_0130", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118"];
-
-
+    let pdfList = ["MRST2007lomod", "MRSTMCal", "MRST2004qed_proton",  "NNPDF31_lo_as_0118", "NNPDF31_lo_as_0130", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118",
+                  "H1PDF2017", "HERAPDF20_LO_EIG",  "HERAPDF20_NLO_EIG",  "HERAPDF20_NNLO_EIG",  "HERAPDF20_Jets_NLO_EIG" ];
 
 
     let flavList = [
@@ -659,18 +796,32 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     function plot1(id) {
         selStr = '<div id="pdf_'+id+'">';
         selStr +='<select id="pdfType_'+id+'" name="pdf'+id+'" >';
+
+        let pdfNow = "";
+        let flNow = "";
+        if(id <= pdfArr.length) {
+            pdfNow = pdfArr[id-1].pdfName;
+            flNow = pdfArr[id-1].flav;
+        }
+
         for(let pdf of pdfList) {
-            selStr += '<option>'+pdf+'</option>';
+            if(pdf == pdfNow)
+                selStr += '<option selected>'+pdf+'</option>';
+            else
+                selStr += '<option>'+pdf+'</option>';
         }
         selStr += '</select>';
 
         selStr += '<select id="flavourBox_'+id+'" name="flavour'+id+'" >';
         for (fl of flavList) {
-          selStr += '<option>'+fl+'</option>';
+            if(fl == flNow)
+                selStr += '<option selected>'+fl+'</option>';
+            else
+                selStr += '<option>'+fl+'</option>';
         }
         selStr += '</select>';
 
-        if(id >= 2) {
+        if(id >= 1) {
             //selStr += '<span id="closePDF_'+id+'">x</span>';
             selStr += ' '+ delButton(id);
         }
@@ -707,7 +858,8 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     $(document).ready(function(){
         $("#addPDF").click(function(){
             $("#pdfDiv").append(plot1(pdfArr.length+1));
-            pdfArr.push(new PDF("MRST2007lomod", "gluon", pdfArr[pdfArr.length-1].q ));
+            let qVal = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].q : 10;
+            pdfArr.push(new PDF("MRST2007lomod", "gluon", qVal ));
             needRedraw = true;
         });
     });

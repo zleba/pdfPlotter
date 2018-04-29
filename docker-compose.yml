@@ -2,7 +2,7 @@ version: '2'
 services:
   pdfserver:
     image: "zleba/pdfserver"
-    mem_limit: 402m
-    mem_reservation: 402m
+    mem_limit: 412m
+    mem_reservation: 412m
     ports:
      - "80:5000"
