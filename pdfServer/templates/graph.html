@@ -56,13 +56,16 @@
 
 
       function getXpoints(nPoints, xMin, xMax, islogx) {
+          xMin = Number(xMin);
+          xMax = Number(xMax);
           let xpts = [];
           // this is just generation of graph
           if(!islogx || xMin <= 0) {
-              let xmin = xMin - (xMax-xMin)*0.3;
-              let xmax = xMax + (xMax-xMin)*0.3;
+              let xmin = Math.max(0, xMin - (xMax-xMin)*0.3);
+              let xmax = Math.min(1, xMax + (xMax-xMin)*0.3);
               for (var i=0; i<nPoints; i++) {
                   let x = xmin  + i*(xmax-xmin)/nPoints;
+                  //console.log(x);
                   xpts.push(x); 
               }
           }
@@ -290,6 +293,7 @@
         }
         else {
             pdfArr.push(new PDF("MRST2007lomod", "gluon"));
+            pdfArr.push(new PDF("MRSTMCal", "gluon"));
         }
 
         //console.log(win);
@@ -358,7 +362,6 @@
                 grDummy.fMarkerSize = 2;
                 grDummy.fFillColor = 3;
                 grDummy.fFillStyle = 1001;
-                grArr.push(grDummy);
 
                 grDummyR = JSROOT.CreateTGraph(1, [0], [0]);
                 grDummyR.fName = "";
@@ -368,17 +371,11 @@
                 grDummyR.fFillColor = 3;
                 grDummyR.fFillStyle = 1001;
 
+                grArr.push(grDummy);
                 grRatArr.push(grDummyR);
 
              }
          }
-
-         for(let i = 0; i < pdfArr.length; ++i) {
-            grArr.push(pdfArr[i].graph);
-            grRatArr.push(pdfArr[i].graphRat);
-         }
-
-
 
  
          let mgraph = JSROOT.CreateTMultiGraph(...grArr);
@@ -513,6 +510,11 @@
 
          //$("#pdfFrame").empty(); //Remove before drawing
          JSROOT.redraw('pdfFrame', mgraph, "", function(obj) {
+             console.log('I am redrawing main frame1');
+             console.log(obj.frame_painter());
+             console.log(obj.root_pad());
+             console.log(obj);
+             console.log('I am redrawing main frame2');
              //mainPainter = obj;
              drawing_ready = true; needRedraw = false;
 
@@ -561,7 +563,6 @@
                    mainPainter = obj;
                    fp.OldDrawAxes = fp.DrawAxes;
 
-
                    fp.OldZoom = fp.Zoom;
                    // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
                    fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
@@ -594,7 +595,7 @@
 
 
                    fp.DrawAxes = function(shrink) {
-                      needRedraw = true;
+                      //needRedraw = true;
 
                       if(obj)
                          codeURL(obj, ratioPainter);
@@ -602,6 +603,10 @@
                       if(ratioPainter != null) {
                          ratioPainter.root_pad().fUxmin =   obj.root_pad().fUxmin;
                          ratioPainter.root_pad().fUxmax =   obj.root_pad().fUxmax;
+                        
+                         if(ratioPainter.root_pad().fLogx  !=   obj.root_pad().fLogx)
+                            needRedraw = true;
+
                          ratioPainter.root_pad().fLogx  =   obj.root_pad().fLogx;
                          //ratioPainter.frame_painter().DrawAxes();
                       }
@@ -643,6 +648,7 @@
                    // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
                    fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
 
+                     console.log('in zoom function');
                      if(typeof xmin != 'undefined' ||  typeof xmax != 'undefined' ) {
                         needRedraw = true;
 
@@ -653,6 +659,29 @@
 
                       this.OldZoom(xmin,xmax,ymin,ymax,zmin,zmax);
                    }
+
+
+                   fp.OldDrawAxes = fp.DrawAxes;
+                   fp.DrawAxes = function(shrink) {
+
+                      //if(obj)
+                         //codeURL(obj, ratioPainter);
+
+                      if(mainPainter != null) {
+                         mainPainter.root_pad().fUxmin =   obj.root_pad().fUxmin;
+                         mainPainter.root_pad().fUxmax =   obj.root_pad().fUxmax;
+                         //ratioPainter.frame_painter().DrawAxes();
+                         if(mainPainter.root_pad().fLogx  !=   obj.root_pad().fLogx)
+                              needRedraw = true;
+
+                         mainPainter.root_pad().fLogx  =   obj.root_pad().fLogx;
+                      }
+
+                      this.OldDrawAxes(shrink);
+                   };
+
+
+
 
 
 
@@ -691,6 +720,9 @@
          }
 
          let xpts =  getXpoints(npoints, xminTemp, xmaxTemp, isLogTemp);
+         //console.log("Info " + npoints + " " + xminTemp + " " + xmaxTemp + " " +isLogTemp);
+         //console.log(xpts);
+
          let xpointsStr = JSON.stringify(xpts);
 
 
@@ -702,8 +734,9 @@
 
         console.log("Updating GUI -- start");
         let funs = []
-        for(let i = 0; i < pdfArr.length; ++i)
+        for(let i = 0; i < pdfArr.length; ++i) {
             funs.push(ajaxG(pdfArr[i].pdfName,pdfArr[i].flav, pdfArr[i].q) );
+        }
 
 //[ajaxG(pdfArr[0].pdfName,pdfArr[0].flav), ajaxG(pdfArr[1].pdfName, pdfArr[1].flav)];
         if(pdfArr.length >= 1) {
