@@ -21,8 +21,20 @@
 
   <div style="float:left;width:500px;height:700px">
   <p>
-  <div id="ratioFrame" style="position: absolute;left:0;top:340px; width: 500px; height:250px"></div>
-  <div id="pdfFrame" style="position: absolute;left:0;top:0; width: 500px; height:350px"></div>
+    <script>
+    let w  = 500;
+    let h1 = 350;
+    let h2 = 250;
+    let s = 10; //space
+    
+    let scale = 1.5;
+    w  *= scale;
+    h1 *= scale;
+    h2 *= scale;
+    s  *= scale;
+  document.write('<div id="ratioFrame" style="position: absolute;left:0;top:'+(h1-s)+'px; width: '+w+'px; height:'+h2+'px"></div>');
+  document.write('<div id="pdfFrame" style="position: absolute;left:0;top:0; width: '+w+'px; height:'+h1+'px"></div>');
+    </script>
   </p>
   </div>
  
@@ -405,7 +417,7 @@
 
          
          h1.fXaxis.fTickLength = 0.03;
-         h1.fYaxis.fTitleOffset = 1.1;
+         h1.fYaxis.fTitleOffset = 1.2;
          h1.fYaxis.fLabelOffset = 0.015;
 
 
@@ -430,7 +442,7 @@
          */
 
          h1.fYaxis.fXmin = -1e2;
-         h1.fYaxis.fXmax = 1e4;
+         h1.fYaxis.fXmax = 1e5;
          mgraph.fHistogram = h1;
  
 
@@ -449,7 +461,7 @@
          h1Rat.fXaxis.fTitle = "x";
          h1Rat.fXaxis.fTitleOffset = 1.1;
          h1Rat.fYaxis.fTitle = "ratio";
-         h1Rat.fYaxis.fTitleOffset = 0.8;
+         h1Rat.fYaxis.fTitleOffset = 0.9;
          h1Rat.fYaxis.fLabelOffset = 0.015;
 
 
