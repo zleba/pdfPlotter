@@ -278,6 +278,16 @@
                 win[key] = objPars.get(key);
             }
         }
+
+        win.xl = Number(win.xl);
+        win.xh = Number(win.xh);
+        
+        win.yl = Number(win.yl);
+        win.yh = Number(win.yh);
+
+        win.rl = Number(win.rl);
+        win.rh = Number(win.rh);
+
         win.logX = win.log[0] == '1' ? true : false;
         win.logY = win.log[1] == '1' ? true : false;
 
@@ -510,11 +520,12 @@
 
          //$("#pdfFrame").empty(); //Remove before drawing
          JSROOT.redraw('pdfFrame', mgraph, "", function(obj) {
-             console.log('I am redrawing main frame1');
-             console.log(obj.frame_painter());
-             console.log(obj.root_pad());
-             console.log(obj);
-             console.log('I am redrawing main frame2');
+             //console.log('I am redrawing main frame1');
+             //console.log(obj.frame_painter());
+             //console.log(obj.root_pad());
+             //console.log(obj);
+             //console.log('I am redrawing main frame2');
+
              //mainPainter = obj;
              drawing_ready = true; needRedraw = false;
 
@@ -589,8 +600,9 @@
 
                    //let xminR = 1e-5, xmaxR = 1;
                    //let xminR = win.xl, xmaxR = win.xh;
-                   if(win.yl == undefined || win.yh == undefined)
+                   if(win.yl == undefined || win.yh == undefined || isNaN(win.yl) || isNaN(win.yh) ) {
                        [win.yl, win.yh] = getYrange(pdfArr, win.xl, win.xh);
+                   }
                    fp.Zoom(win.xl, win.xh, win.yl, win.yh); //zoom
 
 
@@ -641,6 +653,7 @@
                    fp.fX1NDC = 0.15;
                    fp.fX2NDC = 0.95;
 
+                   //console.log('zooming '+ (typeof win.rl) + " " + (typeof win.rh));
                    fp.Zoom(win.xl, win.xh, win.rl, win.rh); //zoom
 
 
@@ -648,7 +661,7 @@
                    // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
                    fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
 
-                     console.log('in zoom function');
+                     //console.log('in zoom function');
                      if(typeof xmin != 'undefined' ||  typeof xmax != 'undefined' ) {
                         needRedraw = true;
 
@@ -656,6 +669,7 @@
                            mainPainter.frame_painter().Zoom(xmin, xmax, undefined, undefined, -1);
                         }
                      }
+                    //console.log('ymin='+ ymin + ' ymax=' + ymax);
 
                       this.OldZoom(xmin,xmax,ymin,ymax,zmin,zmax);
                    }
@@ -664,8 +678,9 @@
                    fp.OldDrawAxes = fp.DrawAxes;
                    fp.DrawAxes = function(shrink) {
 
-                      //if(obj)
-                         //codeURL(obj, ratioPainter);
+                     //console.log('Redraw function');
+                      if(obj)
+                          codeURL(mainPainter, obj);
 
                       if(mainPainter != null) {
                          mainPainter.root_pad().fUxmin =   obj.root_pad().fUxmin;
