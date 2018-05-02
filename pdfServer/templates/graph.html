@@ -938,9 +938,12 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
 
     $(document).ready(function(){
         $("#addPDF").click(function(){
-            $("#pdfDiv").append(plot1(pdfArr.length+1));
-            let qVal = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].q : 10;
-            pdfArr.push(new PDF("MRST2007lomod", "gluon", qVal ));
+            let qVal   = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].q : 10;
+            let pdfNow = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].pdfName : "MRST2007lomod";
+            pdfArr.push(new PDF(pdfNow, "gluon", qVal ));
+
+            $("#pdfDiv").append(plot1(pdfArr.length));
+
             needRedraw = true;
             $('.js-example-basic-single').select2();
         });
