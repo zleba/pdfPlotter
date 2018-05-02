@@ -13,6 +13,8 @@
    <script src="https://root.cern/js/latest/scripts/JSRootCore.js" type="text/javascript"></script>
 
    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+   <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
  
 </head>
  
@@ -22,6 +24,25 @@
   <div style="float:left;width:500px;height:700px">
   <p>
     <script>
+
+    $(document).ready(function() {
+        $('.js-example-basic-single').select2();
+    });
+
+
+
+    function getPDFs() {
+        return $.ajax({
+    type: "GET",
+    url:  "/pdfList",
+    async: false
+    }).responseText;
+    }
+    //console.log(getPDFs());
+    result = getPDFs();
+    result = result.replace(/'/g, '"');
+    let pdfList  = JSON.parse(result);
+
     let w  = 500;
     let h1 = 350;
     let h2 = 250;
@@ -831,8 +852,8 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     */
 
     //Print the pdf selectors
-    let pdfList = ["MRST2007lomod", "MRSTMCal", "MRST2004qed_proton",  "NNPDF31_lo_as_0118", "NNPDF31_lo_as_0130", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118",
-                  "H1PDF2017", "HERAPDF20_LO_EIG",  "HERAPDF20_NLO_EIG",  "HERAPDF20_NNLO_EIG",  "HERAPDF20_Jets_NLO_EIG" ];
+    //let pdfList = ["MRST2007lomod", "MRSTMCal", "MRST2004qed_proton",  "NNPDF31_lo_as_0118", "NNPDF31_lo_as_0130", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118",
+                  //"H1PDF2017", "HERAPDF20_LO_EIG",  "HERAPDF20_NLO_EIG",  "HERAPDF20_NNLO_EIG",  "HERAPDF20_Jets_NLO_EIG" ];
 
 
     let flavList = [
@@ -854,8 +875,8 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     ];
 
     function plot1(id) {
-        selStr = '<div id="pdf_'+id+'">';
-        selStr +='<select id="pdfType_'+id+'" name="pdf'+id+'" >';
+        selStr = '<div id="pdf_'+id+'" style="height:50px">';
+        selStr +='<select class="js-example-basic-single" style="width:300px" id="pdfType_'+id+'" name="pdf'+id+'" >';
 
         let pdfNow = "";
         let flNow = "";
@@ -900,8 +921,8 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     console.log('end');
     */
 
-    document.write('<div style="float:right;width:350px;height:300px"><p>');
-    document.write('<div id="qDiv">q = <input type="text" name="qVal" id="qVal" style="width:60px"> GeV</div>');
+    document.write('<div style="float:right;width:450px;height:500px"><p>');
+    document.write('<div id="qDiv" style="height:60px">q = <input type="text" name="qVal" id="qVal" style="width:60px"> GeV</div>');
     document.write('<div id="pdfDiv">');
     for(let i = 1; i <= pdfArr.length; ++i)
         document.write(plot1(i));
@@ -921,6 +942,7 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
             let qVal = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].q : 10;
             pdfArr.push(new PDF("MRST2007lomod", "gluon", qVal ));
             needRedraw = true;
+            $('.js-example-basic-single').select2();
         });
     });
 

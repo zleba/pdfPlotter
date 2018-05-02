@@ -14,7 +14,7 @@ make
 make install
 
 #Download few PDFs
-for pdf in MRSTMCal MRST2007lomod MRST2004qed_proton
-do
-    curl -L http://www.hepforge.org/archive/lhapdf/pdfsets/6.2/$pdf.tar.gz  | tar xz -C $pwd/install/share/LHAPDF
-done
+#for pdf in MRSTMCal MRST2007lomod MRST2004qed_proton
+#do
+#    curl -L http://www.hepforge.org/archive/lhapdf/pdfsets/6.2/$pdf.tar.gz  | tar xz -C $pwd/install/share/LHAPDF
+#done

@@ -56,6 +56,9 @@ def pdfList():
 
 @app.route('/pdf/<string:Type>/<string:pdfSet>/<string:flavour>/<string:varFix>/<float:var>/<points>')
 def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
+    import resource
+    mem_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    print 'Mem usage', mem_usage
 
     if flavour not in flavMap:
         return ""
@@ -63,11 +66,35 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
     if pdfSet not in pdfAvail:
         return ""
 
+    import time
     if pdfSet not in pdfs:
         print "Getting pdf " 
-        pdfs[pdfSet] = lhapdf.getPDFSet(pdfSet).mkPDFs();
+        #pdfs[pdfSet] = [ lhapdf.getPDFSet(pdfSet).mkPDFs()[0]]
+
+        from sys import getsizeof
+        for p in pdfs:
+            print 'RADEK',p, getsizeof(pdfs[p])
+
+        memLimit = 340000
+        if mem_usage > memLimit:
+            tArr = {}
+            for p in pdfs:
+                tArr[pdfs[p]["time"]] = p
+            import collections
+            for t,n in collections.OrderedDict(sorted(tArr.items())).iteritems():
+                del pdfs[n]
+                mem_usageNow = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                print 'deleting',n, mem_usageNow, len(pdfs)
+                if mem_usageNow < memLimit:
+                    break
+
+        pdfs[pdfSet] = { "pdf" : [lhapdf.getPDFSet(pdfSet).mkPDF(0)], "time": time.time() }
+        #pdfs[pdfSet] = [lhapdf.mkPDF(pdfSet, 0)]
+        #lhapdf.mkPDF("CT10", 0)
         print "Done" 
-    pdfNow = pdfs[pdfSet]
+
+    pdfs[pdfSet]["time"] = time.time()
+    pdfNow = pdfs[pdfSet]["pdf"]
 
     def getPDF3(i, x, q):
         if flavour == "up-val":
