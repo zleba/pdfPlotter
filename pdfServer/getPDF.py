@@ -69,13 +69,12 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
     import time
     if pdfSet not in pdfs:
         print "Getting pdf " 
-        #pdfs[pdfSet] = [ lhapdf.getPDFSet(pdfSet).mkPDFs()[0]]
 
         from sys import getsizeof
         for p in pdfs:
             print 'RADEK',p, getsizeof(pdfs[p])
 
-        memLimit = 340000
+        memLimit = 420000
         if mem_usage > memLimit:
             tArr = {}
             for p in pdfs:
@@ -88,7 +87,12 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
                 if mem_usageNow < memLimit:
                     break
 
-        pdfs[pdfSet] = { "pdf" : [lhapdf.getPDFSet(pdfSet).mkPDF(0)], "time": time.time() }
+
+        if pdfSet in ["NNPDF31_lo_as_0118", "NNPDF31_nlo_as_0118", "NNPDF31_nnlo_as_0118"]:
+            pdfs[pdfSet] = { "pdf" : lhapdf.getPDFSet(pdfSet).mkPDFs(), "time": time.time() }
+        else:
+            pdfs[pdfSet] = { "pdf" : [lhapdf.getPDFSet(pdfSet).mkPDF(0)], "time": time.time() }
+
         #pdfs[pdfSet] = [lhapdf.mkPDF(pdfSet, 0)]
         #lhapdf.mkPDF("CT10", 0)
         print "Done" 

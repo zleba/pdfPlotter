@@ -102,7 +102,7 @@
       } 
 
 
-       JSROOT.CreateTGraphErr = function(npoints, xpts, ypts) {
+       JSROOT.CreateTGraphErr = function(npoints, xpts, ypts, yErrL, yErrH) {
           var graph = JSROOT.extend(JSROOT.Create("TGraphAsymmErrors"), { fBits: 0x3000408, fName: "graph", fTitle: "title" });
 
           if (npoints>0) {
@@ -117,8 +117,9 @@
 
                 graph.fEXlow.push(0);
                 graph.fEXhigh.push(0);
-                graph.fEYlow.push(20);
-                graph.fEYhigh.push(20);
+                //let err = ypts[i] / 20;
+                graph.fEYlow.push(yErrL[i]);
+                graph.fEYhigh.push(yErrH[i]);
 
              }
           }
@@ -134,6 +135,7 @@
       class PDF {
           constructor(pdfName, flav="gluon", q=10, scale=1) {
             this.pdfName = pdfName;
+            this.errType = "errSigma";
             this.flav    = flav;
             this.q       = q;
             this.scale   = scale;
@@ -199,7 +201,7 @@
 
                     let idCh = "#" + $(this).attr("id");
                     let i = Number(idCh.split("_").pop()) - 1;
-                    console.log("Flavour changed " + i + " " + pdfArr.length);
+                    //console.log("Flavour changed " + i + " " + pdfArr.length);
 
                     let myValue = $(idCh).find(":selected").val();
                     pdfArr[i].flav = myValue;
@@ -337,30 +339,38 @@
       function mainPlotter(xpts, yptsArr)
       {
          for(let i = 0; i < pdfArr.length; ++i) {
-            pdfArr[i].graph = JSROOT.CreateTGraph(xpts.length, xpts, yptsArr[i]);
+            pdfArr[i].graph = JSROOT.CreateTGraphErr(xpts.length, xpts, yptsArr[i].map(x => x[0]), 
+                  yptsArr[i].map(x => x[1]),
+                  yptsArr[i].map(x => x[1])
+            );
          }
 
          var yptsRatArr = [];
          for(let j = 0; j < yptsArr.length; ++j) {
              let tempRat = [];
              for(let i = 0; i < xpts.length; ++i) {
-                 let ref = yptsArr[0][i];
+                 let ref = yptsArr[0][i][0];
                  if(ref == 0) ref = 1;
-                 let val = yptsArr[j][i];
+                 let val = yptsArr[j][i][0];
+                 let err = yptsArr[j][i][1];
                  if(val == 0 && ref == 0)
-                    tempRat.push(1);
+                    tempRat.push([1,0]);
                 else if(val != 0 && ref == 0)
-                    tempRat.push(0);
+                    tempRat.push([0,0]);
                 else
-                    tempRat.push(val/ref);
+                    tempRat.push([val/ref, err/ref]);
             }
             yptsRatArr.push(tempRat);
          }
          for(let i = 0; i < pdfArr.length; ++i) {
-            pdfArr[i].graphRat = JSROOT.CreateTGraph(xpts.length, xpts, yptsRatArr[i]);
+            pdfArr[i].graphRat = JSROOT.CreateTGraphErr(xpts.length, xpts, yptsRatArr[i].map(x => x[0]), 
+            yptsRatArr[i].map(x => x[1]), 
+            yptsRatArr[i].map(x => x[1]) 
+            );
          }
 
-         let cols = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+         let cols  = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+         let fills = [3001, 3006, 3004, 3010, 3021, 3022, 3005, 3007, 3003, 3003, 3003];
 
          let grArr = [];
          let grRatArr = [];
@@ -368,39 +378,53 @@
 
              if(i < pdfArr.length) {
                  pdfArr[i].graph.fName = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
+                 pdfArr[i].graph.fBits |= JSROOT.BIT(18);
                  pdfArr[i].graph.fLineColor = cols[i];
                  pdfArr[i].graph.fLineWidth = 2;
                  pdfArr[i].graph.fMarkerSize = 2;
-                 pdfArr[i].graph.fFillColor = 3;
-                 pdfArr[i].graph.fFillStyle = 1001;
+                 pdfArr[i].graph.fFillColor = cols[i];
+                 pdfArr[i].graph.fFillStyle = fills[i];
 
                  pdfArr[i].graphRat.fName = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
                  pdfArr[i].graphRat.fLineColor = cols[i];
                  pdfArr[i].graphRat.fLineWidth = 2;
                  pdfArr[i].graphRat.fMarkerSize = 2;
-                 pdfArr[i].graphRat.fFillColor = 3;
-                 pdfArr[i].graphRat.fFillStyle = 1001;
+                 pdfArr[i].graphRat.fFillColor = cols[i];
+                 pdfArr[i].graphRat.fFillStyle = fills[i];
 
                  grArr.push(pdfArr[i].graph);
                  grRatArr.push(pdfArr[i].graphRat);
 
+                if(mainPainter != null) {
+                     mainPainter.painters[i].draw_object.fEYlow  = pdfArr[i].graph.fEYlow;  //hope
+                     mainPainter.painters[i].draw_object.fEYhigh = pdfArr[i].graph.fEYhigh; //hope
+                     mainPainter.draw_object.fGraphs.arr[i].fEYlow  = pdfArr[i].graph.fEYlow;
+                     mainPainter.draw_object.fGraphs.arr[i].fEYhigh = pdfArr[i].graph.fEYhigh; //hope
+                 }
+                if(ratioPainter != null) {
+                     ratioPainter.painters[i].draw_object.fEYlow  = pdfArr[i].graphRat.fEYlow;  //hope
+                     ratioPainter.painters[i].draw_object.fEYhigh = pdfArr[i].graphRat.fEYhigh; //hope
+                     ratioPainter.draw_object.fGraphs.arr[i].fEYlow  = pdfArr[i].graphRat.fEYlow;
+                     ratioPainter.draw_object.fGraphs.arr[i].fEYhigh = pdfArr[i].graphRat.fEYhigh; //hope
+                 }
+
              }
              else {
-                grDummy = JSROOT.CreateTGraph(1, [0], [0]);
+                grDummy = JSROOT.CreateTGraphErr(1, [0], [0],   [0],[0]);
                 grDummy.fName = "";
                 grDummy.fLineColor = cols[i];
                 grDummy.fLineWidth = 2;
                 grDummy.fMarkerSize = 2;
-                grDummy.fFillColor = 3;
-                grDummy.fFillStyle = 1001;
+                grDummy.fFillColor = cols[i];
+                grDummy.fFillStyle = fills[i];
 
-                grDummyR = JSROOT.CreateTGraph(1, [0], [0]);
+                grDummyR = JSROOT.CreateTGraphErr(1, [0], [0],      [0],[0]);
                 grDummyR.fName = "";
                 grDummyR.fLineColor = cols[i];
                 grDummyR.fLineWidth = 2;
                 grDummyR.fMarkerSize = 2;
-                grDummyR.fFillColor = 3;
-                grDummyR.fFillStyle = 1001;
+                grDummyR.fFillColor = cols[i];
+                grDummyR.fFillStyle = fills[i];
 
                 grArr.push(grDummy);
                 grRatArr.push(grDummyR);
@@ -518,7 +542,7 @@
              leg.fPrimitives.Add(CreateLegendEntry(null, "q = "+pdfArr[0].q+" GeV", "h"));
          for(let i = 0; i < pdfArr.length; ++i) {
              description = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
-             leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description));
+             leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description, 'lf'));
          }
             
 
@@ -540,18 +564,49 @@
          
 
          //$("#pdfFrame").empty(); //Remove before drawing
-         JSROOT.redraw('pdfFrame', mgraph, "", function(obj) {
+         JSROOT.redraw('pdfFrame', mgraph, "l3", function(obj) {
              //console.log('I am redrawing main frame1');
              //console.log(obj.frame_painter());
              //console.log(obj.root_pad());
              //console.log(obj);
-             //console.log('I am redrawing main frame2');
+             //console.log('Printout start EYlow');
+             //console.log(obj.draw_object.fGraphs.arr[0].fEYlow[100])
+             //console.log(obj.draw_object.fGraphs.arr[1].fEYlow[100])
+             //console.log(obj.draw_object.fGraphs.arr[2].fEYlow[100])
+             //console.log('Printout end EYlow');
+             //console.log('Printout start EYhigh');
+             //console.log(obj.draw_object.fGraphs.arr[0].fEYhigh[100])
+             //console.log(obj.draw_object.fGraphs.arr[1].fEYhigh[100])
+             //console.log(obj.draw_object.fGraphs.arr[2].fEYhigh[100])
+             //console.log('Printout end EYhigh');
+
+             //console.log('Printout start EYlow (met2)');
+             //console.log(obj.painters[0].draw_object.fY[100] +" "+  obj.painters[0].draw_object.fEYlow[100] );
+             //console.log(obj.painters[1].draw_object.fY[100] +" "+  obj.painters[1].draw_object.fEYlow[100] );
+             //console.log(obj.painters[2].draw_object.fY[100] +" "+  obj.painters[2].draw_object.fEYlow[100] );
+             //console.log('Printout end EYlow (met2)');
+
+             //console.log('Printout start EYlow (real)');
+             //console.log(pdfArr[0].graph.fY[100]  +" "+  pdfArr[0].graph.fEYlow[100] );
+             //console.log(pdfArr[1].graph.fY[100]  +" "+  pdfArr[1].graph.fEYlow[100] );
+             //console.log(pdfArr[2].graph.fY[100]  +" "+  pdfArr[2].graph.fEYlow[100] );
+             //console.log('Printout end EYlow (real)');
+             //console.log(mgraph);
+             //console.log('Printout end EYlow (realVeryEnd)');
+
 
              //mainPainter = obj;
              drawing_ready = true; needRedraw = false;
 
-            for(let i = 0; i < pdfArr.length; ++i)
+            for(let i = 0; i < pdfArr.length; ++i) {
                 obj.painters[i].draw_object.fName = pdfArr[i].graph.fName;
+                //obj.painters[i].draw_object.
+                obj.painters[i].draw_object.fEYlow  = pdfArr[i].graph.fEYlow;  //hope
+                obj.painters[i].draw_object.fEYhigh = pdfArr[i].graph.fEYhigh; //hope
+
+                obj.draw_object.fGraphs.arr[i].fEYlow  = pdfArr[i].graph.fEYlow;
+                obj.draw_object.fGraphs.arr[i].fEYhigh = pdfArr[i].graph.fEYhigh; //hope
+            }
 
             if(obj.painters.length != pdfArr.length) {
                 //obj.painters[2] = new JSROOT.TGraphPainter(pdfArr[2].graph);
@@ -658,7 +713,7 @@
          });
 
          //$("#ratioFrame").empty(); //Remove before drawing
-         JSROOT.redraw('ratioFrame', mgraphRat , "", function(obj) {
+         JSROOT.redraw('ratioFrame', mgraphRat , "l3", function(obj) {
 
             for(let i = 0; i < pdfArr.length; ++i)
                 obj.painters[i].draw_object.fName = pdfArr[i].graph.fName;
@@ -762,16 +817,16 @@
          let xpointsStr = JSON.stringify(xpts);
 
 
-        let ajaxG = function(myPDF,fl, q) {
+        let ajaxG = function(myPDF, err, fl, q) {
             return $.ajax({
-        url:  "/pdf/central/"+myPDF+"/"+fl+"/q/"+ q.toFixed(5) + "/"+xpointsStr });
+        url:  "/pdf/"+err+"/"+myPDF+"/"+fl+"/q/"+ q.toFixed(5) + "/"+xpointsStr });
         }
 
 
         console.log("Updating GUI -- start");
         let funs = []
         for(let i = 0; i < pdfArr.length; ++i) {
-            funs.push(ajaxG(pdfArr[i].pdfName,pdfArr[i].flav, pdfArr[i].q) );
+            funs.push(ajaxG(pdfArr[i].pdfName, pdfArr[i].errType, pdfArr[i].flav, pdfArr[i].q) );
         }
 
 //[ajaxG(pdfArr[0].pdfName,pdfArr[0].flav), ajaxG(pdfArr[1].pdfName, pdfArr[1].flav)];
@@ -788,6 +843,9 @@
                         vals.push(JSON.parse(resArr[0]));
                     }
                     //console.log('results3');
+                    //console.log('pepa1');
+                    //console.log(vals);
+                    //console.log('pepa2');
                     mainPlotter(xpts, vals);
             });
         }
