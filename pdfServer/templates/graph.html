@@ -5,7 +5,7 @@
    <meta charset="UTF-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
  
-   <title>TMultiGraph with TLegend and custom labels</title>
+   <title>PDF plotter</title>
  
    <!--<script src="/home/radek/Downloads/root/root/etc/http/scripts/JSRootCore.js" type="text/javascript"></script>-->
    <!-- <script src="https://root.cern/js/5.3.1/scripts/JSRootCore.js" type="text/javascript"></script> -->
@@ -48,6 +48,8 @@
     let h2 = 250;
     let s = 10; //space
     
+    let isChangeM = false, isChangeR = false;
+
     let scale = 1.5;
     w  *= scale;
     h1 *= scale;
@@ -133,11 +135,12 @@
 
 
       class PDF {
-          constructor(pdfName, flav="gluon", q=10, scale=1) {
+          constructor(pdfName, flav="gluon", type, varFix=10, scale=1) {
             this.pdfName = pdfName;
             this.errType = "errSigma";
+            this.type    = type;
             this.flav    = flav;
-            this.q       = q;
+            this.fixVal  = varFix;
             this.scale   = scale;
             this.graph   = null;
             this.graphRat= null;
@@ -157,14 +160,21 @@
 
     $(function() {
         if(pdfArr[0] != undefined)
-            $("#qVal").attr("value", pdfArr[0].q);
+            $("#fixVal").attr("value", pdfArr[0].fixVal);
         else
-            $("#qVal").attr("value", '10');
+            $("#fixVal").attr("value", '10');
 
-        $('#qDiv').on('keyup change', 'input[id^="qVal"]', function() { // code
-            let qMy =  Number($(this).val());
+        $('#qDiv').on('keyup change', 'input[id^="fixVal"]', function() { // code
+            let fMy =  Number($(this).val());
+            if(isNaN(fMy)) fMy = 0;
+            fMy=Math.max(0, fMy);
+
+            if(pdfArr.length > 0  && pdfArr[0].type == "xFixed") {
+               fMy = Math.min(1, fMy); 
+            }
+
             for(let i = 0; i < pdfArr.length; ++i)
-                pdfArr[i].q = qMy;
+                pdfArr[i].fixVal = fMy;
             //let idCh = "#" + $(this).attr("id");
             //$('#qDiv').append('rad');
             needRedraw = true;
@@ -235,6 +245,7 @@
                         for(t of modArr)
                             $('#' + t + '_'+(k+1)).attr("id", t+'_'+k);
                     }
+                    $('.js-example-basic-single').select2();
 
 
             });
@@ -245,6 +256,8 @@
 
     function codeURL(mainFrame, ratioFrame)
     {
+        if(mainFrame == null || ratioFrame == null)
+            return;
         //console.log(mainFrame.root_pad());
         let isLogX = mainFrame.root_pad().fLogx;
         let isLogY = mainFrame.root_pad().fLogy;
@@ -254,6 +267,12 @@
         let ymax = mainFrame.root_pad().fUymax;
         let rmin = ratioFrame.root_pad().fUymin;
         let rmax = ratioFrame.root_pad().fUymax;
+
+        let legX1 = mainFrame.draw_object.fFunctions.arr[0].fX1NDC;
+        let legX2 = mainFrame.draw_object.fFunctions.arr[0].fX2NDC;
+        let legY1 = mainFrame.draw_object.fFunctions.arr[0].fY1NDC;
+        let legY2 = mainFrame.draw_object.fFunctions.arr[0].fY2NDC;
+
 
         if(isLogX) {
             xmin = Math.pow(10, xmin);
@@ -265,14 +284,21 @@
         }
         
         let s = 'pdfs=';
-        for(let i = 0; i < pdfArr.length; ++i)
-            s +=  pdfArr[i].pdfName +':'+ pdfArr[i].flav + ':q='+ pdfArr[i].q +  (i != pdfArr.length-1 ? ',': '');
+        for(let i = 0; i < pdfArr.length; ++i) {
+            //console.log('type is '+i+' ' + pdfArr[i].type);
+            if(pdfArr[i].type == "qFixed")
+                s +=  pdfArr[i].pdfName +':'+ pdfArr[i].flav + ':q='+ pdfArr[i].fixVal +  (i != pdfArr.length-1 ? ',': '');
+            else if(pdfArr[i].type == "xFixed")
+                s +=  pdfArr[i].pdfName +':'+ pdfArr[i].flav + ':x='+ pdfArr[i].fixVal +  (i != pdfArr.length-1 ? ',': '');
+        }
 
         s += '&';
         s += 'xl='+ xmin + '&xh='+xmax + '&yl='+ymin+'&yh='+ymax + '&rl='+rmin + '&rh='+rmax;
         s += '&';
         s += 'log='+isLogX+isLogY;
-        //console.log('I am inside '+ymax);
+        s += '&';
+        s += 'leg='+legX1+','+legX2+','+legY1+','+legY2;
+        //console.log('I am inside codeURL '+s);
         window.history.pushState("object or string", "Title", "?" + s);
     }
 
@@ -282,9 +308,38 @@
         let url_string = window.location.href;
         let objPars = (new URL(url_string)).searchParams;
 
+        let pdfArr = [];
+        if(objPars.get('pdfs')) {
+            let pdfStr = objPars.get('pdfs').split(',');
+
+            for(p of pdfStr) {
+                let pNow = {};
+                let str = p.split(':');
+                if(str[2][0] == 'q')
+                    pdfArr.push(new PDF(str[0], str[1], 'qFixed', Number(str[2].substring(2))));
+                else if(str[2][0] == 'x') {
+                    pdfArr.push(new PDF(str[0], str[1], 'xFixed', Number(str[2].substring(2))));
+                }
+            }
+        }
+        else {
+            pdfArr.push(new PDF("MRST2007lomod",  "gluon",  "qFixed"));
+            pdfArr.push(new PDF("MRSTMCal", "gluon", "qFixed"));
+        }
+
+
+
+
         let win = {};
+
         win.xl = 1e-5;
         win.xh = 1;
+
+        if(pdfArr.length > 0 && pdfArr[0].type == "xFixed") {
+            win.xl = 2;
+            win.xh = 1000;
+        }
+
         
         win.yl = undefined;
         win.yh = undefined;
@@ -293,6 +348,11 @@
         win.rh = 2;
 
         win.log  = '11';
+
+        win.legX1 = 0.60;
+        win.legX2 = 0.95;
+        win.legY1 = 0.7;
+        win.legY2 = 0.9;
 
         for(let key in win) {
             //console.log('Getting property'+key);
@@ -314,20 +374,15 @@
         win.logX = win.log[0] == '1' ? true : false;
         win.logY = win.log[1] == '1' ? true : false;
 
-        let pdfArr = [];
-        if(objPars.get('pdfs')) {
-            let pdfStr = objPars.get('pdfs').split(',');
 
-            for(p of pdfStr) {
-                let pNow = {};
-                let str = p.split(':');
-                pdfArr.push(new PDF(str[0], str[1], Number(str[2].substring(2))));
-            }
+        if(objPars.get('leg')) {
+            let legStr = objPars.get('leg').split(',');
+            win.legX1 = Number(legStr[0]);
+            win.legX2 = Number(legStr[1]);
+            win.legY1 = Number(legStr[2]);
+            win.legY2 = Number(legStr[3]);
         }
-        else {
-            pdfArr.push(new PDF("MRST2007lomod", "gluon"));
-            pdfArr.push(new PDF("MRSTMCal", "gluon"));
-        }
+
 
         //console.log(win);
         //console.log(pdfArr);
@@ -338,6 +393,7 @@
 
       function mainPlotter(xpts, yptsArr)
       {
+         console.log('RADEKcheck ' + yptsArr.length +' ' + pdfArr.length);
          for(let i = 0; i < pdfArr.length; ++i) {
             pdfArr[i].graph = JSROOT.CreateTGraphErr(xpts.length, xpts, yptsArr[i].map(x => x[0]), 
                   yptsArr[i].map(x => x[1]),
@@ -442,6 +498,11 @@
 
          h1.fXaxis.fXmin = 1e-8;
          h1.fXaxis.fXmax = 1;
+         if(pdfArr.length>0 && pdfArr[0].type == "xFixed") {
+             h1.fXaxis.fXmin = 1.0;
+             h1.fXaxis.fXmax = 1.0e5;
+             console.log('setting xFixed limits');
+         }
 
          //h1.fXaxis.fTitle = "x";
          h1.fYaxis.fTitle = "xf(x)";
@@ -510,8 +571,23 @@
          h1Rat.fXaxis.fXmin =  h1.fXaxis.fXmin;
          h1Rat.fXaxis.fXmax =  h1.fXaxis.fXmax;
 
-         h1Rat.fXaxis.fTitle = "x";
-         h1Rat.fXaxis.fTitleOffset = 1.1;
+         console.log('ratio limits '+ h1Rat.fXaxis.fXmin + ' '+ h1Rat.fXaxis.fXmax);
+
+         let selected = $('input[name="type"]:checked', '#typeChanger');
+         if(selected.length != 0) {
+            let typ = selected.val();
+            h1Rat.fXaxis.fTitle = typ == "xFixed" ? "q [GeV]" : "x";
+         }
+
+
+         /*
+         if(pdfArr[0].type == "qFixed")
+             h1Rat.fXaxis.fTitle = "x";
+         else if(pdfArr[0].type == "xFixed")
+             h1Rat.fXaxis.fTitle = "q [GeV]";
+         */
+
+         h1Rat.fXaxis.fTitleOffset = 1.3;
          h1Rat.fYaxis.fTitle = "ratio";
          h1Rat.fYaxis.fTitleOffset = 0.9;
          h1Rat.fYaxis.fLabelOffset = 0.015;
@@ -534,15 +610,23 @@
 
 
          let leg = JSROOT.Create("TLegend");
-         leg.fName = "graphs_legend";
-         width = pdfArr.length * 0.06;
-         JSROOT.extend(leg, { fX1NDC: 0.55, fY1NDC:0.7, fX2NDC: 0.9, fY2NDC:0.85 });
+         leg.fName = "pdfLegend";
+         //width = pdfArr.length * 0.06;
+         //JSROOT.extend(leg, { fX1NDC: 0.55, fY1NDC:0.7, fX2NDC: 0.9, fY2NDC:0.85 });
+         JSROOT.extend(leg, { fX1NDC: win.legX1, fY1NDC:win.legY1, fX2NDC: win.legX2, fY2NDC:win.legY2 });
 
-         if(pdfArr[0] != undefined)
-             leg.fPrimitives.Add(CreateLegendEntry(null, "q = "+pdfArr[0].q+" GeV", "h"));
+         if(pdfArr[0] != undefined) {
+             if(pdfArr[0].type == "qFixed")
+                 leg.fPrimitives.Add(CreateLegendEntry(null, "q = "+pdfArr[0].fixVal+" GeV", "h"));
+             else if(pdfArr[0].type == "xFixed")
+                 leg.fPrimitives.Add(CreateLegendEntry(null, "x = "+pdfArr[0].fixVal+"", "h"));
+         }
          for(let i = 0; i < pdfArr.length; ++i) {
              description = pdfArr[i].pdfName +" ("+pdfArr[i].flav+")";
-             leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description, 'lf'));
+             if(pdfArr[i].graph.fEYlow[100] != 0)
+                 leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description, 'lf'));
+             else
+                 leg.fPrimitives.Add(CreateLegendEntry(pdfArr[i].graph, description, 'l'));
          }
             
 
@@ -551,7 +635,6 @@
  
          mgraph.fFunctions.Add(leg,"");
 
-         //console.log(mgraph);
          //console.log(pdfArr[0].graph);
          //console.log(h1);
 
@@ -563,36 +646,11 @@
          drawing_ready = false;
          
 
+
+
+
          //$("#pdfFrame").empty(); //Remove before drawing
          JSROOT.redraw('pdfFrame', mgraph, "l3", function(obj) {
-             //console.log('I am redrawing main frame1');
-             //console.log(obj.frame_painter());
-             //console.log(obj.root_pad());
-             //console.log(obj);
-             //console.log('Printout start EYlow');
-             //console.log(obj.draw_object.fGraphs.arr[0].fEYlow[100])
-             //console.log(obj.draw_object.fGraphs.arr[1].fEYlow[100])
-             //console.log(obj.draw_object.fGraphs.arr[2].fEYlow[100])
-             //console.log('Printout end EYlow');
-             //console.log('Printout start EYhigh');
-             //console.log(obj.draw_object.fGraphs.arr[0].fEYhigh[100])
-             //console.log(obj.draw_object.fGraphs.arr[1].fEYhigh[100])
-             //console.log(obj.draw_object.fGraphs.arr[2].fEYhigh[100])
-             //console.log('Printout end EYhigh');
-
-             //console.log('Printout start EYlow (met2)');
-             //console.log(obj.painters[0].draw_object.fY[100] +" "+  obj.painters[0].draw_object.fEYlow[100] );
-             //console.log(obj.painters[1].draw_object.fY[100] +" "+  obj.painters[1].draw_object.fEYlow[100] );
-             //console.log(obj.painters[2].draw_object.fY[100] +" "+  obj.painters[2].draw_object.fEYlow[100] );
-             //console.log('Printout end EYlow (met2)');
-
-             //console.log('Printout start EYlow (real)');
-             //console.log(pdfArr[0].graph.fY[100]  +" "+  pdfArr[0].graph.fEYlow[100] );
-             //console.log(pdfArr[1].graph.fY[100]  +" "+  pdfArr[1].graph.fEYlow[100] );
-             //console.log(pdfArr[2].graph.fY[100]  +" "+  pdfArr[2].graph.fEYlow[100] );
-             //console.log('Printout end EYlow (real)');
-             //console.log(mgraph);
-             //console.log('Printout end EYlow (realVeryEnd)');
 
 
              //mainPainter = obj;
@@ -650,6 +708,12 @@
                    mainPainter = obj;
                    fp.OldDrawAxes = fp.DrawAxes;
 
+                    obj.pad_painter().painters[14].PaveDrawFuncOld =   obj.pad_painter().painters[14].PaveDrawFunc;
+                    obj.pad_painter().painters[14].PaveDrawFunc = function(w,h) {
+                        codeURL(mainPainter, ratioPainter);
+                        obj.pad_painter().painters[14].PaveDrawFuncOld(w,h);
+                    };
+
                    fp.OldZoom = fp.Zoom;
                    // redefine zoom function of TH2 painter to make synchronous zooming of TH1 object
                    fp.Zoom = function(xmin,xmax,ymin,ymax,zmin,zmax) {
@@ -685,8 +749,9 @@
                    fp.DrawAxes = function(shrink) {
                       //needRedraw = true;
 
-                      if(obj)
+                      if(obj) {
                          codeURL(obj, ratioPainter);
+                      }
 
                       if(ratioPainter != null) {
                          ratioPainter.root_pad().fUxmin =   obj.root_pad().fUxmin;
@@ -705,12 +770,18 @@
                    //needRedraw = false;
                }
 
-
+               if(isChangeM) {
+                    console.log('Zooming main ' + win.xl + ' ' + win.xh);
+                    fp.Zoom(win.xl, win.xh, undefined, undefined, -1);
+                    isChangeM = false;
+                }
 
                ++cnt;
                //console.log(obj.frame_painter());
                //console.log(obj.root_pad());
          });
+
+
 
          //$("#ratioFrame").empty(); //Remove before drawing
          JSROOT.redraw('ratioFrame', mgraphRat , "l3", function(obj) {
@@ -755,8 +826,9 @@
                    fp.DrawAxes = function(shrink) {
 
                      //console.log('Redraw function');
-                      if(obj)
+                      if(obj) {
                           codeURL(mainPainter, obj);
+                      }
 
                       if(mainPainter != null) {
                          mainPainter.root_pad().fUxmin =   obj.root_pad().fUxmin;
@@ -779,6 +851,15 @@
             }
 
             ratioPainter = obj;
+
+            if(isChangeR) {
+                console.log('Zooming Rat ' + win.xl + ' ' + win.xh);
+                //obj.frame_painter().Zoom(win.xl, win.xh); //zoom
+                obj.frame_painter().Zoom(win.xl, win.xh, undefined, undefined, -1);
+                isChangeR = false;
+            }
+
+
             drawing_ready = true;
 
          });
@@ -817,16 +898,18 @@
          let xpointsStr = JSON.stringify(xpts);
 
 
-        let ajaxG = function(myPDF, err, fl, q) {
+        let ajaxG = function(myPDF, type, err, fl, fixVal) {
+            //console.log('radek ' + type);
+            let s = (type == "xFixed") ? "x" : "q";
             return $.ajax({
-        url:  "/pdf/"+err+"/"+myPDF+"/"+fl+"/q/"+ q.toFixed(5) + "/"+xpointsStr });
+        url:  "/pdf/"+err+"/"+myPDF+"/"+fl+"/"+s+"/"+ fixVal.toFixed(5) + "/"+xpointsStr });
         }
 
 
         console.log("Updating GUI -- start");
         let funs = []
         for(let i = 0; i < pdfArr.length; ++i) {
-            funs.push(ajaxG(pdfArr[i].pdfName, pdfArr[i].errType, pdfArr[i].flav, pdfArr[i].q) );
+            funs.push(ajaxG(pdfArr[i].pdfName, pdfArr[i].type, pdfArr[i].errType, pdfArr[i].flav, pdfArr[i].fixVal) );
         }
 
 //[ajaxG(pdfArr[0].pdfName,pdfArr[0].flav), ajaxG(pdfArr[1].pdfName, pdfArr[1].flav)];
@@ -836,8 +919,10 @@
 
                     let vals = [];
                     if(funs.length > 1) {
-                        for(r of resArr)
+                        for(r of resArr) {
+                            r[0] = r[0].replace(/inf/g, '0.0');
                             vals.push(JSON.parse(r[0]));
+                        }
                     }
                     else {
                         vals.push(JSON.parse(resArr[0]));
@@ -980,7 +1065,20 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
     */
 
     document.write('<div style="float:right;width:450px;height:500px"><p>');
-    document.write('<div id="qDiv" style="height:60px">q = <input type="text" name="qVal" id="qVal" style="width:60px"> GeV</div>');
+    document.write('<div id="qDiv" style="height:120px">');
+
+    let qCh='', xCh='', lCh='';
+    if(pdfArr[0].type == "qFixed")
+        qCh = "checked";
+    else if(pdfArr[0].type == "xFixed")
+        xCh = "checked";
+
+    document.write('<div style="display: block;float:left;width=160px"  id="typeChanger">');
+    document.write('<input type="radio" name="type" value="qFixed" '+qCh+'> q fixed <br>');
+    document.write('<input type="radio" name="type" value="xFixed" '+xCh+'> x fixed </div> ');
+
+    document.write('<div style="display:block;float:left"> q = <input type="text" name="fixVal" id="fixVal" style="width:60px"> GeV</div></div>');
+
     document.write('<div id="pdfDiv">');
     for(let i = 1; i <= pdfArr.length; ++i)
         document.write(plot1(i));
@@ -995,17 +1093,105 @@ url:  "/pdf/cental/MRST2007lomod/gluon/q/10.0/[0.01,0.08]" });
 
 
     $(document).ready(function(){
+
+        //$('input[type=radio][name=type]').change(function() {
+        $('#typeChanger').on('change', 'input[type=radio][name=type]', function(){
+            console.log('ahoj Holka');
+            let selected = $('input[name="type"]:checked', '#typeChanger');
+            if(selected.length != 0) {
+                let typ = selected.val();
+
+                let fixVal = (typ == "xFixed") ? 0.01 : 10;
+
+                for(let i = 0; i < pdfArr.length; ++i) {
+                    pdfArr[i].type   = typ;
+                    pdfArr[i].fixVal = fixVal;
+                }
+                
+                if(typ == "xFixed") {
+                    mainPainter.root_pad().fUxmin = 2.0;
+                    mainPainter.root_pad().fUxmax = 1000.0;
+                }
+                else if(typ == "qFixed") {
+                    mainPainter.root_pad().fUxmin = 1.0e-5;
+                    mainPainter.root_pad().fUxmax = 1.0;
+                }
+                win.xl = mainPainter.root_pad().fUxmin;
+                win.xh = mainPainter.root_pad().fUxmax;
+
+                if(mainPainter.root_pad().fLogx) {
+                    mainPainter.root_pad().fUxmin = Math.log10(mainPainter.root_pad().fUxmin);
+                    mainPainter.root_pad().fUxmax = Math.log10(mainPainter.root_pad().fUxmax);
+                }
+
+                ratioPainter.root_pad().fUxmin = mainPainter.root_pad.fUxmin;
+                ratioPainter.root_pad().fUxmax = mainPainter.root_pad.fUxmax;
+
+
+                codeURL(mainPainter, ratioPainter);
+
+               // do stuff here
+
+               console.log('changing fix value marketa ' + fixVal);
+               //$("#fixVal").attr("value", fixVal);
+               $("#fixVal").val(fixVal);
+               console.log('changed to marketa '+ $("#fixVal").val() );
+
+               needRedraw = true;
+               isChangeM = true;
+               isChangeR = true;
+            }
+        });
+
         $("#addPDF").click(function(){
-            let qVal   = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].q : 10;
-            let pdfNow = pdfArr.length > 0 ? pdfArr[pdfArr.length-1].pdfName : "MRST2007lomod";
-            pdfArr.push(new PDF(pdfNow, "gluon", qVal ));
+
+            let fixVal, pdfNow, Type;
+            if(pdfArr.length > 0) {
+                fixVal   = pdfArr[pdfArr.length-1].fixVal;
+                pdfNow   = pdfArr[pdfArr.length-1].pdfName;
+                Type     = pdfArr[pdfArr.length-1].type;
+            }
+            else {
+                pdfNow   = "MRST2007lomod";
+
+                let selected = $('input[name="type"]:checked', '#typeChanger');
+                if(selected.length != 0)
+                    Type = selected.val();
+                else
+                    Type = "qFixed";
+                fixVal = Number($("#fixVal").val());
+                if(isNaN(fixVal)) fixVal = 0;
+            }
+
+            console.log('Adding pdf '+ Type + ' '+ fixVal);
+
+            pdfArr.push(new PDF(pdfNow, "gluon", Type, fixVal ));
 
             $("#pdfDiv").append(plot1(pdfArr.length));
 
             needRedraw = true;
+            
+            if(pdfArr.length > 6) {
+               $("#addPDF").hide(); 
+            }
             $('.js-example-basic-single').select2();
+
         });
     });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     function delButton(ID) {

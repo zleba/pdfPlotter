@@ -66,6 +66,14 @@ def sendPDF(Type, pdfSet, flavour, varFix, var,  points):
     if pdfSet not in pdfAvail:
         return ""
 
+#    if varFix == "x":
+#        varFix = max(1, varFix)
+#        varFix = min(1e-8, varFix)
+#        if varFix < 0.5 or varFix > 100000:
+#            return ""
+        
+
+
     import time
     if pdfSet not in pdfs:
         print "Getting pdf " 
