@@ -21,8 +21,7 @@
 <body>
  
 
-  <div style="float:left;width:500px;height:700px">
-  <p>
+  <div style="position: relative;width:1200px;height:900px; margin:0 auto;border:0px solid black;">
     <script>
 
     $(document).ready(function() {
@@ -58,13 +57,11 @@
   document.write('<div id="ratioFrame" style="position: absolute;left:0;top:'+(h1-s)+'px; width: '+w+'px; height:'+h2+'px"></div>');
   document.write('<div id="pdfFrame" style="position: absolute;left:0;top:0; width: '+w+'px; height:'+h1+'px"></div>');
     </script>
-  </p>
-  </div>
  
    <script type='text/javascript'>
  
 
-      var cnt = 0, drawing_ready = true;
+      var cnt = 0, drawing_ready = [true, true];
       var needRedraw = true;
       var ratioPainter = null;
       var mainPainter = null;
@@ -165,7 +162,10 @@
             $("#fixVal").attr("value", '10');
 
         $('#qDiv').on('keyup change', 'input[id^="fixVal"]', function() { // code
-            let fMy =  Number($(this).val());
+            let str = $(this).val()
+            str = str.replace(/[^0-9.e\-]/g,'');
+            let strUsed = str[str.length-1] == 'e' ? str + '0' : str;
+            let fMy =  Number(strUsed);
             if(isNaN(fMy)) fMy = 0;
             fMy=Math.max(0, fMy);
 
@@ -177,6 +177,9 @@
                 pdfArr[i].fixVal = fMy;
             //let idCh = "#" + $(this).attr("id");
             //$('#qDiv').append('rad');
+            //$('#fixVal')
+            console.log('changint to '+ str);
+            $("#fixVal").val(str);
             needRedraw = true;
         });
     });
@@ -400,6 +403,7 @@
                   yptsArr[i].map(x => x[1])
             );
          }
+         console.log('PUPUPPPPPPPPPPPPPPPPPPP '  + win.xl + ' ' + win.xh);
 
          var yptsRatArr = [];
          for(let j = 0; j < yptsArr.length; ++j) {
@@ -643,18 +647,15 @@
          // mgraph.fMinimum = 0;
          // mgraph.fMaximum = 400;
          //console.log(JSON.stringify(JSROOT));
-         drawing_ready = false;
+
+         drawing_ready = [false,false];
          
-
-
-
-
          //$("#pdfFrame").empty(); //Remove before drawing
          JSROOT.redraw('pdfFrame', mgraph, "l3", function(obj) {
 
 
              //mainPainter = obj;
-             drawing_ready = true; needRedraw = false;
+             needRedraw = false;
 
             for(let i = 0; i < pdfArr.length; ++i) {
                 obj.painters[i].draw_object.fName = pdfArr[i].graph.fName;
@@ -773,12 +774,15 @@
                if(isChangeM) {
                     console.log('Zooming main ' + win.xl + ' ' + win.xh);
                     fp.Zoom(win.xl, win.xh, undefined, undefined, -1);
+                    obj.root_pad().fUxmin = Math.log10(win.xl);
+                    obj.root_pad().fUxmax = Math.log10(win.xh);
                     isChangeM = false;
                 }
 
                ++cnt;
                //console.log(obj.frame_painter());
                //console.log(obj.root_pad());
+               drawing_ready[0] = true; 
          });
 
 
@@ -856,11 +860,13 @@
                 console.log('Zooming Rat ' + win.xl + ' ' + win.xh);
                 //obj.frame_painter().Zoom(win.xl, win.xh); //zoom
                 obj.frame_painter().Zoom(win.xl, win.xh, undefined, undefined, -1);
+
                 isChangeR = false;
+
             }
 
 
-            drawing_ready = true;
+            drawing_ready[1] = true;
 
          });
 
@@ -872,10 +878,10 @@
 
 
       function updateGUI() {
-         if (!drawing_ready) return;
+         if (drawing_ready[0] == false || drawing_ready[1] == false) return;
          if (!needRedraw) return;
          
-         drawing_ready = false;
+         drawing_ready = [false,false];
 
          let xminTemp = win.xl;
          let xmaxTemp = win.xh;
@@ -889,6 +895,8 @@
                 xminTemp = Math.pow(10, xminTemp);
                 xmaxTemp = Math.pow(10, xmaxTemp);
              }
+             win.xl = xminTemp; //RADEK add
+             win.xh = xmaxTemp; //RADEK add
          }
 
          let xpts =  getXpoints(npoints, xminTemp, xmaxTemp, isLogTemp);
@@ -906,11 +914,11 @@
         }
 
 
-        console.log("Updating GUI -- start");
         let funs = []
         for(let i = 0; i < pdfArr.length; ++i) {
             funs.push(ajaxG(pdfArr[i].pdfName, pdfArr[i].type, pdfArr[i].errType, pdfArr[i].flav, pdfArr[i].fixVal) );
         }
+        console.log("Updating GUI -- start : " + funs.length + ' ' + pdfArr.length);
 
 //[ajaxG(pdfArr[0].pdfName,pdfArr[0].flav), ajaxG(pdfArr[1].pdfName, pdfArr[1].flav)];
         if(pdfArr.length >= 1) {
@@ -931,6 +939,14 @@
                     //console.log('pepa1');
                     //console.log(vals);
                     //console.log('pepa2');
+                    console.log('before ' + funs.length +' ' + pdfArr.length);
+                    if(funs.length != pdfArr.length) {
+                        needRedraw    = true;
+                        drawing_ready = true;
+                        return;
+                    }
+
+
                     mainPlotter(xpts, vals);
             });
         }
@@ -1205,6 +1221,10 @@ return '<svg enable-background="new 0 0 32 32" height="16px" id="closePDF_'+ID+'
 
 
     </script>
+
+
+    </div>
+
 
 </body>
 </html>

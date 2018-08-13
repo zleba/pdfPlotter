@@ -9,5 +9,13 @@
       "ContainerPort": "5000"
     }
   ],
+
+  "Volumes": [
+  {
+      "HostDirectory": "/home/ec2-user/lhapdfDir",
+      "ContainerDirectory": "/pdfPlotter/lhapdf/install/share/LHAPDF"
+  }
+  ],
+
   "Logging": "/var/log/pdfserver"
 }
