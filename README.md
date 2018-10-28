@@ -4,7 +4,7 @@ Currently the central values of all PDFs are included.
 
 Experimental version built from this repository may run on
 
-http://pdfplotter.ddns.net
+http://pdfplotter.eu
 
 ## Technical description
 The front-end is written in Javascript, the most crucial is the ROOTJS which is used for interactive plotting.
