@@ -2,4 +2,4 @@ sudo: required
   
 script:
 #Compile it
-    - curl -Ls  http://pdfplotter.eu | grep -q delButtton
+    - curl -Ls  http://pdfplotter.eu | grep -q delButton
