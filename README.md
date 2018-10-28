@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/zleba/pdfPlotter.svg?branch=master)](https://travis-ci.org/zleba/pdfPlotter)
 # pdfPlotter
 The online tool for plotting of PDFs from LHAPDF6 library.
 Currently the central values of all PDFs are included.
